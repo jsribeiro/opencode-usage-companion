@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use crate::auth::{AntigravityAccount, AuthManager, GeminiTokenResponse};
 use crate::error::{QuotaError, Result};
-use crate::providers::{GeminiData, GeminiModelQuota, Provider, ProviderData};
+use crate::providers::{GeminiAccountData, GeminiData, GeminiModelQuota, Provider, ProviderData};
 
 /// Public Google OAuth client credentials for CLI/installed apps
 /// These are NOT secrets - see https://developers.google.com/identity/protocols/oauth2/native-app
@@ -186,24 +186,14 @@ impl GeminiProvider {
     async fn fetch_account_quota(
         &self,
         account: &AntigravityAccount,
+        is_active: bool,
         timeout: Duration,
-    ) -> Result<GeminiData> {
+    ) -> Result<GeminiAccountData> {
         let access_token = self.refresh_access_token(&account.refresh_token).await?;
 
         // Get project ID - either from account or from loadCodeAssist
         let project_id = account.project_id.clone()
-            .or_else(|| account.managed_project_id.clone())
-            .or_else(|| {
-                // Try to get from loadCodeAssist
-                match tokio::runtime::Handle::try_current() {
-                    Ok(_) => {
-                        // We're in async context, can call async function
-                        // But we need to handle this differently
-                        None
-                    }
-                    Err(_) => None,
-                }
-            });
+            .or_else(|| account.managed_project_id.clone());
 
         // If no project ID, try to get it from loadCodeAssist
         let project_id = if project_id.is_none() {
@@ -223,26 +213,24 @@ impl GeminiProvider {
         if let Some(models_map) = models_response.models {
             for (model_key, info) in models_map {
                 if let Some(quota_info) = info.quota_info {
-                    // Filter out unwanted models (same logic as the TypeScript plugin)
-                    let label = info.display_name.unwrap_or_else(|| model_key.clone());
-                    let lower_label = label.to_lowercase();
-                    
-                    if lower_label.starts_with("chat_") ||
-                       lower_label.starts_with("rev19") ||
-                       lower_label.contains("gemini 2.5") ||
-                       lower_label.contains("gemini 3 pro image") {
+                    // Use display_name for user-friendly output, fall back to model key
+                    let display_name = info.display_name.unwrap_or_else(|| model_key.clone());
+                    let lower_name = display_name.to_lowercase();
+
+                    // Filter out internal/test models only
+                    if lower_name.starts_with("chat_") || lower_name.starts_with("rev19") {
                         continue;
                     }
 
                     let remaining_fraction = quota_info.remaining_fraction.unwrap_or(0.0)
                         .clamp(0.0, 1.0);
-                    
+
                     let reset_time = quota_info.reset_time
                         .and_then(|t| t.parse::<DateTime<Utc>>().ok())
                         .or_else(|| Some(now + chrono::Duration::days(1)));
 
                     models.push(GeminiModelQuota {
-                        model: info.model.unwrap_or(model_key),
+                        model: display_name,
                         remaining_percent: remaining_fraction * 100.0,
                         reset_time,
                     });
@@ -250,12 +238,12 @@ impl GeminiProvider {
             }
         }
 
-        // Sort models by label
+        // Sort models by display name
         models.sort_by(|a, b| a.model.cmp(&b.model));
 
-        Ok(GeminiData {
-            account_email: account.email.clone(),
-            is_active: true,
+        Ok(GeminiAccountData {
+            email: account.email.clone(),
+            is_active,
             models,
         })
     }
@@ -275,30 +263,38 @@ impl Provider for GeminiProvider {
 
     async fn fetch(&self, timeout: Duration) -> Result<ProviderData> {
         // Read antigravity accounts
-        let accounts = self
+        let antigravity = self
             .auth_manager
             .read_antigravity_accounts()?
             .ok_or_else(|| QuotaError::ProviderNotConfigured("gemini (no antigravity accounts found)".to_string()))?;
 
-        if accounts.accounts.is_empty() {
+        if antigravity.accounts.is_empty() {
             return Err(QuotaError::ProviderNotConfigured(
                 "gemini (no accounts in antigravity file)".to_string(),
             ));
         }
 
-        // For now, fetch the active account
-        // TODO: Support multiple accounts like the TypeScript plugin does
-        let account = accounts.accounts.get(accounts.active_index)
-            .or_else(|| accounts.accounts.first())
-            .ok_or_else(|| QuotaError::ProviderNotConfigured(
-                "gemini (invalid active account index)".to_string(),
-            ))?;
+        // Fetch quota for all accounts
+        let mut account_data: Vec<GeminiAccountData> = Vec::new();
 
-        let data = self
-            .fetch_account_quota(account, timeout)
-            .await?;
+        for (idx, account) in antigravity.accounts.iter().enumerate() {
+            let is_active = idx == antigravity.active_index;
+            match self.fetch_account_quota(account, is_active, timeout).await {
+                Ok(data) => account_data.push(data),
+                Err(e) => {
+                    // Log error but continue with other accounts
+                    eprintln!("Warning: Failed to fetch quota for {}: {}", account.email, e);
+                }
+            }
+        }
 
-        Ok(ProviderData::Gemini(data))
+        if account_data.is_empty() {
+            return Err(QuotaError::ApiError(
+                "Failed to fetch quota for any Gemini account".to_string(),
+            ));
+        }
+
+        Ok(ProviderData::Gemini(GeminiData { accounts: account_data }))
     }
 }
 
@@ -329,7 +325,6 @@ struct FetchAvailableModelsResponse {
 struct CloudCodeModelInfo {
     #[serde(rename = "displayName")]
     display_name: Option<String>,
-    model: Option<String>,
     #[serde(rename = "quotaInfo")]
     quota_info: Option<CloudCodeQuotaInfo>,
     #[serde(rename = "supportsImages")]

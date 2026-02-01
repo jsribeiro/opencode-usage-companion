@@ -33,10 +33,15 @@ pub enum ProviderData {
     Claude(ClaudeData),
 }
 
-/// Gemini/Antigravity provider data
+/// Gemini/Antigravity provider data (supports multiple accounts)
 #[derive(Debug, Clone, Serialize)]
 pub struct GeminiData {
-    pub account_email: String,
+    pub accounts: Vec<GeminiAccountData>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GeminiAccountData {
+    pub email: String,
     pub is_active: bool,
     pub models: Vec<GeminiModelQuota>,
 }
@@ -111,7 +116,10 @@ impl ProviderData {
     pub fn status(&self) -> ProviderStatus {
         match self {
             ProviderData::Gemini(data) => {
-                let min_remaining = data.models.iter().map(|m| m.remaining_percent).min_by(|a, b| a.partial_cmp(b).unwrap());
+                let min_remaining = data.accounts.iter()
+                    .flat_map(|a| a.models.iter())
+                    .map(|m| m.remaining_percent)
+                    .min_by(|a, b| a.partial_cmp(b).unwrap());
                 match min_remaining {
                     Some(remaining) if remaining < 20.0 => ProviderStatus::Warning,
                     _ => ProviderStatus::Ok,
