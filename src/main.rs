@@ -92,17 +92,19 @@ async fn main() -> ExitCode {
     println!("Fetching quota information...\n");
 
     if args.concurrent {
-        // Concurrent fetching
-        let futures = providers.iter().map(|provider| {
-            let timeout = timeout;
-            async move {
-                let name = provider.name();
-                match provider.fetch(timeout).await {
-                    Ok(data) => Ok(data),
-                    Err(e) => Err((name, e)),
+        // Concurrent fetching - only fetch configured providers
+        let futures = providers.iter()
+            .filter(|p| p.is_configured())
+            .map(|provider| {
+                let timeout = timeout;
+                async move {
+                    let name = provider.name();
+                    match provider.fetch(timeout).await {
+                        Ok(data) => Ok(data),
+                        Err(e) => Err((name, e)),
+                    }
                 }
-            }
-        });
+            });
 
         let outcomes = futures::future::join_all(futures).await;
 
