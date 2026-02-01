@@ -21,8 +21,10 @@ pub struct OAuthToken {
     #[serde(rename = "type")]
     pub token_type: String,
     pub access: String,
-    pub refresh: String,
-    pub expires: i64,
+    #[serde(default)]
+    pub refresh: Option<String>,
+    #[serde(default)]
+    pub expires: Option<i64>,
     #[serde(rename = "accountId")]
     pub account_id: Option<String>,
 }
@@ -142,11 +144,9 @@ impl AuthManager {
 
         match provider {
             "gemini" => {
-                // Check for antigravity-accounts.json (Antigravity plugin setup)
-                let has_antigravity_file = antigravity_accounts.is_some();
-                // Also check for Google OAuth (fallback)
-                let has_google_oauth = opencode_auth.as_ref().map(|a| a.google.is_some()).unwrap_or(false);
-                Ok(has_antigravity_file || has_google_oauth)
+                // Only check for antigravity-accounts.json - Google OAuth alone is not sufficient
+                // since the Gemini provider only supports Antigravity accounts
+                Ok(antigravity_accounts.is_some())
             }
             "claude" => Ok(opencode_auth.as_ref().map(|a| a.anthropic.is_some()).unwrap_or(false)),
             "codex" => Ok(opencode_auth.as_ref().map(|a| a.openai.is_some()).unwrap_or(false)),

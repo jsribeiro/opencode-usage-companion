@@ -19,7 +19,7 @@ impl CopilotProvider {
     }
 
     /// Fetch billing/overage data from GitHub API
-    /// Returns None if the API call fails (e.g., insufficient permissions)
+    /// Returns None if the API call fails, with warnings logged for specific errors
     async fn fetch_billing_data(
         &self,
         client: &Client,
@@ -27,7 +27,7 @@ impl CopilotProvider {
         timeout: Duration,
     ) -> Option<CopilotOverageCharges> {
         // First, get the authenticated user's login
-        let user_response = client
+        let user_response = match client
             .get("https://api.github.com/user")
             .header("Authorization", format!("token {}", token))
             .header("Accept", "application/json")
@@ -36,14 +36,37 @@ impl CopilotProvider {
             .timeout(timeout)
             .send()
             .await
-            .ok()?;
+        {
+            Ok(resp) => resp,
+            Err(e) => {
+                eprintln!("Warning: Failed to fetch GitHub user info: {}", e);
+                return None;
+            }
+        };
 
         if !user_response.status().is_success() {
+            eprintln!(
+                "Warning: GitHub user API returned status {}",
+                user_response.status()
+            );
             return None;
         }
 
-        let user: serde_json::Value = user_response.json().await.ok()?;
-        let username = user.get("login")?.as_str()?;
+        let user: serde_json::Value = match user_response.json().await {
+            Ok(u) => u,
+            Err(e) => {
+                eprintln!("Warning: Failed to parse GitHub user response: {}", e);
+                return None;
+            }
+        };
+
+        let username = match user.get("login").and_then(|l| l.as_str()) {
+            Some(u) => u,
+            None => {
+                eprintln!("Warning: GitHub user response missing 'login' field");
+                return None;
+            }
+        };
 
         // Fetch billing premium request usage
         let billing_url = format!(
@@ -51,7 +74,7 @@ impl CopilotProvider {
             username
         );
 
-        let billing_response = client
+        let billing_response = match client
             .get(&billing_url)
             .header("Authorization", format!("token {}", token))
             .header("Accept", "application/json")
@@ -60,13 +83,38 @@ impl CopilotProvider {
             .timeout(timeout)
             .send()
             .await
-            .ok()?;
+        {
+            Ok(resp) => resp,
+            Err(e) => {
+                eprintln!("Warning: Failed to fetch Copilot billing data: {}", e);
+                return None;
+            }
+        };
 
-        if !billing_response.status().is_success() {
+        let status = billing_response.status();
+        if !status.is_success() {
+            if status.as_u16() == 403 {
+                eprintln!(
+                    "Warning: Copilot billing API returned 403 Forbidden - token may lack billing scope"
+                );
+            } else if status.as_u16() == 404 {
+                // 404 is expected for users without billing access - don't warn
+            } else {
+                eprintln!(
+                    "Warning: Copilot billing API returned status {}",
+                    status
+                );
+            }
             return None;
         }
 
-        let billing: BillingUsageResponse = billing_response.json().await.ok()?;
+        let billing: BillingUsageResponse = match billing_response.json().await {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("Warning: Failed to parse Copilot billing response: {}", e);
+                return None;
+            }
+        };
 
         // Sum up all Copilot-related charges
         let (total_quantity, total_amount) = billing

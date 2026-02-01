@@ -130,7 +130,7 @@ impl ProviderData {
                 let min_remaining = data.accounts.iter()
                     .flat_map(|a| a.models.iter())
                     .map(|m| m.remaining_percent)
-                    .min_by(|a, b| a.partial_cmp(b).unwrap());
+                    .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
                 match min_remaining {
                     Some(remaining) if remaining < 20.0 => ProviderStatus::Warning,
                     _ => ProviderStatus::Ok,
