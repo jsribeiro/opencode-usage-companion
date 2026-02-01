@@ -123,18 +123,19 @@ ocu -t 5
 │ Provider            │ Model                            │ Usage │ Resets │ Status │
 ╞═════════════════════╪══════════════════════════════════╪═══════╪════════╪════════╡
 │ Gemini              │ MODEL_CLAUDE_4_5_SONNET          │ 0%    │ 6d     │ ✓ OK   │
-│ user@example.com    │ MODEL_CLAUDE_4_5_SONNET_THINKING │ 0%    │ 6d     │        │
-│                     │ MODEL_GPT_4O                     │ 0%    │ 6d     │        │
-├─────────────────────┼──────────────────────────────────┼───────┼────────┼────────┤
+│ user@example.com    │ MODEL_CLAUDE_4_5_SONNET_THINKING │ 0%    │ 6d     │ ✓ OK   │
+│                     │ MODEL_OPENAI_GPT_OSS_120B_MEDIUM │ 0%    │ 6d     │ ✓ OK   │
+├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┤
 │ Codex               │ Primary                          │ 9%    │ 2h 1m  │ ✓ OK   │
-│                     │ Secondary                        │ 3%    │ 73h 41m│        │
-├─────────────────────┼──────────────────────────────────┼───────┼────────┼────────┤
+│                     │ Secondary                        │ 3%    │ 73h 41m│ ✓ OK   │
+├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┤
 │ Claude              │ 5h Window                        │ 23%   │ 4h 30m │ ✓ OK   │
-│                     │ 7d Window                        │ 4%    │ 5d     │        │
+│                     │ 7d Window                        │ 4%    │ 5d     │ ✓ OK   │
 ╰─────────────────────┴──────────────────────────────────┴───────┴────────┴────────╯
 ```
 
 - **Usage column**: Shows percentage of quota consumed (0% = all quota available, 100% = quota exhausted)
+- **Status column**: Per-row status based on usage (each model/window has its own indicator)
 - **Color coding**: Green (healthy), yellow (warning >50%), red (critical >80%)
 - **Status icons**: `✓ OK`, `⚠️ WARNING`, `✗ ERROR`
 
