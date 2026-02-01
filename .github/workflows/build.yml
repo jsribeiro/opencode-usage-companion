@@ -99,4 +99,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ github.ref_name }}
+          body: "first working release"
+          generate_release_notes: false
           files: dist/${{ matrix.archive_name }}
