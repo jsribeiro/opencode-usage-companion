@@ -42,7 +42,7 @@ A fast, cross-platform Rust CLI tool that queries AI provider quotas and usage b
 
 ### 3.1 Gemini / Antigravity (Google)
 
-**Type:** Quota-based (per-model)  
+**Type:** Quota-based (shared buckets)  
 **Auth File:** `~/.config/opencode/antigravity-accounts.json` (macOS/Linux), `%APPDATA%/opencode/antigravity-accounts.json` (Windows)  
 **Multi-Account:** Yes, supports multiple Google accounts  
 **API Endpoints:** `cloudcode-pa.googleapis.com` (production)  
@@ -54,7 +54,7 @@ A fast, cross-platform Rust CLI tool that queries AI provider quotas and usage b
    - POST to `https://oauth2.googleapis.com/token` to refresh access token
    - POST to `https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist` (if projectId not available)
    - POST to `https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels` to get quota info
-3. Parse response for per-model quotas
+3. Parse response for shared quota buckets
 
 **Required Headers:**
 ```
@@ -87,7 +87,7 @@ Client Secret: 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
 
 **Display:**
 - Shows email for each account
-- Lists per-model remaining percentages
+- Lists bucket remaining percentages
 - Shows reset time for all models
 - Filters out chat_, rev19, and gemini 2.5 models
 
@@ -494,8 +494,8 @@ Minimal text output, one line per provider.
 
 **Example:**
 ```
-Gemini (user@example.com): 2.0-flash:100%, 2.5-pro:85%, 2.5-flash:100% - resets in 2h 15m
-Gemini (user2@example.com) [inactive]: 2.0-flash:90%, 2.5-pro:75% - resets in 1h 30m
+Gemini (user@example.com): Claude Models:0%, Gemini Flash:0% - resets in 6d
+Gemini (user2@example.com) [inactive]: Gemini 3 Pro:90%, Gemini Flash:50% - resets in 1h 30m
 Codex: primary:9%, secondary:3% - primary resets in 1h 52m
 Copilot: used 5321/1500 (overage permitted) - resets Feb 1
 Claude: 5h:23%, 7d:4% - 5h resets in 2h 15m

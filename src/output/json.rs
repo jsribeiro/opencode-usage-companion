@@ -1,6 +1,6 @@
 use crate::providers::ProviderData;
-use serde::Serialize;
 use chrono::Utc;
+use serde::Serialize;
 
 /// JSON output structure
 #[derive(Serialize)]

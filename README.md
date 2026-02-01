@@ -20,22 +20,7 @@ A fast, cross-platform Rust CLI tool that queries AI provider quotas and usage b
 
 ### Download from GitHub Releases
 
-```bash
-# Windows
-curl -L -o ocu.exe https://github.com/jsribeiro/opencode-usage-companion/releases/latest/download/ocu-x86_64-pc-windows-msvc.exe
-
-# macOS Intel
-curl -L -o ocu https://github.com/jsribeiro/opencode-usage-companion/releases/latest/download/ocu-x86_64-apple-darwin
-chmod +x ocu
-
-# macOS Apple Silicon
-curl -L -o ocu https://github.com/jsribeiro/opencode-usage-companion/releases/latest/download/ocu-aarch64-apple-darwin
-chmod +x ocu
-
-# Linux
-curl -L -o ocu https://github.com/jsribeiro/opencode-usage-companion/releases/latest/download/ocu-x86_64-unknown-linux-gnu
-chmod +x ocu
-```
+Download the latest release from the [Releases page](https://github.com/jsribeiro/opencode-usage-companion/releases) and copy the executable to a directory on your PATH.
 
 ### Build from Source
 
@@ -88,7 +73,7 @@ ocu -t 5
 
 ### Gemini / Antigravity (Google)
 - Multi-account support
-- Per-model quotas (gemini-2.0-flash, gemini-2.5-pro, etc.)
+- Shared quota buckets (Gemini Flash, Gemini 3 Pro, Claude Models, etc.)
 - Auth: `~/.config/opencode/antigravity-accounts.json` (macOS/Linux) or `%APPDATA%\opencode\antigravity-accounts.json` (Windows)
 
 ### Codex (OpenAI)
@@ -168,6 +153,15 @@ ocu -t 5
 ```
 
 Note: JSON output uses raw API values (`remaining_percent` for Gemini, `used_percent` for others).
+
+### Simple Format
+
+```
+Gemini (user@example.com): Claude Models: 0%, Gemini Flash: 0% - resets in 6d
+Codex: primary: 9%, secondary: 3% - primary resets in 2h 1m
+Copilot: used 5321/1500 (overage permitted) - resets Feb 1
+Claude: 5h: 23%, 7d: 4% - 5h resets in 4h 30m
+```
 
 ## Development
 

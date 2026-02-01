@@ -10,6 +10,6 @@ pub fn format_output(data: &[ProviderData], format: OutputFormat, no_color: bool
     match format {
         OutputFormat::Table => table::format_table(data, no_color),
         OutputFormat::Json => json::format_json(data),
-        OutputFormat::Simple => simple::format_simple(data),
+        OutputFormat::Simple => simple::format_simple(data, no_color),
     }
 }
