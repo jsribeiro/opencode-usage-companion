@@ -470,7 +470,9 @@ fn get_usage_color(percent: i32) -> Color {
 /// Get status based on usage percentage (for per-row status)
 /// Lower usage = OK, higher = warning
 fn get_row_status(used_percent: i32) -> ProviderStatus {
-    if used_percent >= 80 {
+    if used_percent >= 100 {
+        ProviderStatus::Error
+    } else if used_percent >= 80 {
         ProviderStatus::Warning
     } else {
         ProviderStatus::Ok
