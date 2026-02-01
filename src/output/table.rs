@@ -1,4 +1,4 @@
-use crate::providers::{ClaudeData, CodexData, CopilotData, GeminiData, ProviderData, ProviderStatus};
+use crate::providers::{ClaudeData, CodexData, CopilotData, GeminiAccountData, GeminiData, ProviderData, ProviderStatus};
 use tabled::{builder::Builder, settings::Style, settings::Color, settings::span::Span, settings::style::HorizontalLine, settings::themes::BorderCorrection};
 
 /// Format data as a pretty table with UTF-8 borders
@@ -116,7 +116,10 @@ pub fn format_table(data: &[ProviderData], no_color: bool) -> String {
 fn count_provider_rows(data: &ProviderData) -> usize {
     match data {
         ProviderData::Gemini(gemini) => {
-            if gemini.models.is_empty() { 1 } else { gemini.models.len() }
+            let total: usize = gemini.accounts.iter()
+                .map(|a| if a.models.is_empty() { 1 } else { a.models.len() })
+                .sum();
+            if total == 0 { 1 } else { total }
         }
         ProviderData::Codex(_) => 2,
         ProviderData::Copilot(_) => 1,
@@ -147,31 +150,59 @@ fn add_gemini_rows(
     start_row: usize,
     cell_colors: &mut Vec<(usize, usize, Color)>
 ) {
-    let provider_name = if data.is_active {
+    let mut current_row = start_row;
+    let mut is_first_row = true;
+
+    for account in &data.accounts {
+        add_gemini_account_rows(builder, account, no_color, &mut current_row, cell_colors, &mut is_first_row);
+    }
+
+    // If no accounts or all accounts empty, add a placeholder row
+    if is_first_row {
+        builder.push_record([
+            "Gemini".to_string(),
+            "-".to_string(),
+            "-".to_string(),
+            "-".to_string(),
+            "✓ OK".to_string(),
+        ]);
+        if !no_color {
+            cell_colors.push((start_row, 4, Color::FG_GREEN));
+        }
+    }
+}
+
+fn add_gemini_account_rows(
+    builder: &mut Builder,
+    account: &GeminiAccountData,
+    no_color: bool,
+    current_row: &mut usize,
+    cell_colors: &mut Vec<(usize, usize, Color)>,
+    is_first_row: &mut bool,
+) {
+    let provider_name = if account.is_active {
         "Gemini".to_string()
     } else {
         "Gemini [inactive]".to_string()
     };
 
-    let provider_cell = format!("{}\n{}", provider_name, data.account_email);
+    let provider_cell = format!("{}\n{}", provider_name, account.email);
 
     // Add one row per model with per-model status
     // Invert usage to show % USED (like other providers) instead of % remaining
-    // 100% remaining becomes 0% used, 0% remaining becomes 100% used
-    for (i, model) in data.models.iter().enumerate() {
+    for model in &account.models {
         let reset_str = model.reset_time
             .map(|t| format_reset_time(t))
             .unwrap_or_else(|| "-".to_string());
 
         let used_percent = (100.0 - model.remaining_percent) as i32;
         let usage_str = format!("{}%", used_percent);
-        let current_row = start_row + i;
 
         // Per-model status
         let row_status = get_row_status(used_percent);
         let status_text = format_status(row_status);
 
-        if i == 0 {
+        if *is_first_row {
             builder.push_record([
                 provider_cell.clone(),
                 model.model.clone(),
@@ -179,6 +210,7 @@ fn add_gemini_rows(
                 reset_str,
                 status_text,
             ]);
+            *is_first_row = false;
         } else {
             builder.push_record([
                 String::new(),
@@ -193,23 +225,37 @@ fn add_gemini_rows(
         if !no_color {
             let usage_color = get_usage_color(used_percent);
             let status_color = get_status_color(row_status);
-            cell_colors.push((current_row, 2, usage_color));
-            cell_colors.push((current_row, 4, status_color));
+            cell_colors.push((*current_row, 2, usage_color));
+            cell_colors.push((*current_row, 4, status_color));
         }
+
+        *current_row += 1;
     }
 
-    // If no models, add a row indicating that
-    if data.models.is_empty() {
-        builder.push_record([
-            provider_cell,
-            "-".to_string(),
-            "-".to_string(),
-            "-".to_string(),
-            "✓ OK".to_string(),
-        ]);
-        if !no_color {
-            cell_colors.push((start_row, 4, Color::FG_GREEN));
+    // If account has no models, add a placeholder row
+    if account.models.is_empty() {
+        if *is_first_row {
+            builder.push_record([
+                provider_cell,
+                "-".to_string(),
+                "-".to_string(),
+                "-".to_string(),
+                "✓ OK".to_string(),
+            ]);
+            *is_first_row = false;
+        } else {
+            builder.push_record([
+                String::new(),
+                "-".to_string(),
+                "-".to_string(),
+                "-".to_string(),
+                "✓ OK".to_string(),
+            ]);
         }
+        if !no_color {
+            cell_colors.push((*current_row, 4, Color::FG_GREEN));
+        }
+        *current_row += 1;
     }
 }
 

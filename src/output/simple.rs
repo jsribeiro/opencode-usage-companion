@@ -23,36 +23,42 @@ fn format_provider_simple(data: &ProviderData) -> String {
 }
 
 fn format_gemini_simple(data: &GeminiData) -> String {
-    let active_marker = if data.is_active { "" } else { " [inactive]" };
-
-    let models = data
-        .models
+    data.accounts
         .iter()
-        .map(|m| format!("{}:{:.0}%", m.model, m.remaining_percent))
-        .collect::<Vec<_>>()
-        .join(", ");
+        .map(|account| {
+            let active_marker = if account.is_active { "" } else { " [inactive]" };
 
-    let reset = data
-        .models
-        .first()
-        .and_then(|m| m.reset_time)
-        .map(|t| {
-            let now = Utc::now();
-            let duration = t.signed_duration_since(now);
-            if duration.num_hours() > 24 {
-                format!("{} days", duration.num_days())
-            } else if duration.num_hours() > 0 {
-                format!("{}h {}m", duration.num_hours(), duration.num_minutes() % 60)
-            } else {
-                format!("{}m", duration.num_minutes())
-            }
+            let models = account
+                .models
+                .iter()
+                .map(|m| format!("{}:{:.0}%", m.model, m.remaining_percent))
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            let reset = account
+                .models
+                .first()
+                .and_then(|m| m.reset_time)
+                .map(|t| {
+                    let now = Utc::now();
+                    let duration = t.signed_duration_since(now);
+                    if duration.num_hours() > 24 {
+                        format!("{} days", duration.num_days())
+                    } else if duration.num_hours() > 0 {
+                        format!("{}h {}m", duration.num_hours(), duration.num_minutes() % 60)
+                    } else {
+                        format!("{}m", duration.num_minutes())
+                    }
+                })
+                .unwrap_or_else(|| "-".to_string());
+
+            format!(
+                "Gemini ({}){}: {} - resets in {}",
+                account.email, active_marker, models, reset
+            )
         })
-        .unwrap_or_else(|| "-".to_string());
-
-    format!(
-        "Gemini ({}){}: {} - resets in {}",
-        data.account_email, active_marker, models, reset
-    )
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn format_codex_simple(data: &CodexData) -> String {
