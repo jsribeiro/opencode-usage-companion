@@ -89,7 +89,7 @@ ocu -t 5
 ### Gemini / Antigravity (Google)
 - Multi-account support
 - Per-model quotas (gemini-2.0-flash, gemini-2.5-pro, etc.)
-- Auth: `~/.config/opencode/antigravity-accounts.json`
+- Auth: `~/.config/opencode/antigravity-accounts.json` (macOS/Linux) or `%APPDATA%\opencode\antigravity-accounts.json` (Windows)
 
 ### Codex (OpenAI)
 - Primary/secondary rate limit windows
@@ -119,19 +119,19 @@ ocu -t 5
 ### Table Format
 
 ```
-╭─────────────────────┬──────────────────────────────────┬───────┬────────┬────────╮
-│ Provider            │ Model                            │ Usage │ Resets │ Status │
-╞═════════════════════╪══════════════════════════════════╪═══════╪════════╪════════╡
-│ Gemini              │ MODEL_CLAUDE_4_5_SONNET          │ 0%    │ 6d     │ ✓ OK   │
-│ user@example.com    │ MODEL_CLAUDE_4_5_SONNET_THINKING │ 0%    │ 6d     │ ✓ OK   │
-│                     │ MODEL_OPENAI_GPT_OSS_120B_MEDIUM │ 0%    │ 6d     │ ✓ OK   │
-├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┤
-│ Codex               │ Primary                          │ 9%    │ 2h 1m  │ ✓ OK   │
-│                     │ Secondary                        │ 3%    │ 73h 41m│ ✓ OK   │
-├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┤
-│ Claude              │ 5h Window                        │ 23%   │ 4h 30m │ ✓ OK   │
-│                     │ 7d Window                        │ 4%    │ 5d     │ ✓ OK   │
-╰─────────────────────┴──────────────────────────────────┴───────┴────────┴────────╯
+╭─────────────────────┬──────────────────┬───────┬────────┬────────╮
+│ Provider            │ Model            │ Usage │ Resets │ Status │
+╞═════════════════════╪══════════════════╪═══════╪════════╪════════╡
+│ Gemini              │ Claude Models    │ 0%    │ 6d     │ ✓ OK   │
+│ user@example.com    │ Gemini Flash     │ 0%    │ 6d     │ ✓ OK   │
+│                     │ Gemini 3 Pro     │ 0%    │ 6d     │ ✓ OK   │
+├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┤
+│ Codex               │ Primary          │ 9%    │ 2h 1m  │ ✓ OK   │
+│                     │ Secondary        │ 3%    │ 73h 41m│ ✓ OK   │
+├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┤
+│ Claude              │ 5h Window        │ 23%   │ 4h 30m │ ✓ OK   │
+│                     │ 7d Window        │ 4%    │ 5d     │ ✓ OK   │
+╰─────────────────────┴──────────────────┴───────┴────────┴────────╯
 ```
 
 - **Usage column**: Shows percentage of quota consumed (0% = all quota available, 100% = quota exhausted)
@@ -143,14 +143,18 @@ ocu -t 5
 
 ```json
 {
-  "timestamp": "2025-01-15T14:30:00Z",
+  "timestamp": "2026-02-01T14:30:00Z",
   "providers": [
     {
       "type": "gemini",
-      "account_email": "user@example.com",
-      "is_active": true,
-      "models": [
-        {"model": "gemini-2.0-flash", "remaining_percent": 100.0, "reset_time": "2025-01-22T00:00:00Z"}
+      "accounts": [
+        {
+          "email": "user@example.com",
+          "is_active": true,
+          "models": [
+            {"model": "Gemini Flash", "remaining_percent": 100.0, "reset_time": "2026-02-01T00:00:00Z"}
+          ]
+        }
       ]
     },
     {

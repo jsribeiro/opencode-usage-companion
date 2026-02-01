@@ -91,12 +91,11 @@ Client Secret: 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
 - Shows reset time for all models
 - Filters out chat_, rev19, and gemini 2.5 models
 
-**Known Models:**
-- `MODEL_CLAUDE_4_5_SONNET` - Claude Sonnet 4.5
-- `MODEL_CLAUDE_4_5_SONNET_THINKING` - Claude Sonnet 4.5 with thinking
-- `MODEL_CLAUDE_4_5_OPUS_THINKING` - Claude Opus 4.5 with thinking
-- `MODEL_OPENAI_GPT_OSS_120B_MEDIUM` - GPT-OSS 120B
-- `MODEL_PLACEHOLDER_M7`, `M8`, `M12`, `M18`, `M19` - Gemini models
+**Known Models (Internal Grouping):**
+- `Claude Models` - Includes Claude Sonnet, Opus, etc.
+- `Gemini Flash` - Gemini 1.5/2.0 Flash models
+- `Gemini 3 Pro` - Gemini 3 Pro models
+- `Gemini 3 Pro Image` - Gemini 3 Pro Image models
 
 ---
 
@@ -392,19 +391,19 @@ Uses `tabled` crate (0.20.0) with proper colorization and cell spanning.
 
 **Example:**
 ```
-╭─────────────────────┬──────────────────────────────────┬───────┬────────┬────────╮
-│ Provider            │ Model                            │ Usage │ Resets │ Status │
-╞═════════════════════╪══════════════════════════════════╪═══════╪════════╪════════╡
-│ Gemini              │ MODEL_CLAUDE_4_5_SONNET          │ 0%    │ 6d     │ ✓ OK   │
-│ jsribeiro@gmail.com │ MODEL_CLAUDE_4_5_SONNET_THINKING │ 0%    │ 6d     │        │
-│                     │ MODEL_GPT_4O                     │ 0%    │ 6d     │        │
-├─────────────────────┼──────────────────────────────────┼───────┼────────┼────────┤
-│ Codex               │ Primary                          │ 9%    │ 2h 1m  │ ✓ OK   │
-│                     │ Secondary                        │ 3%    │ 73h 41m│        │
-├─────────────────────┼──────────────────────────────────┼───────┼────────┼────────┤
-│ Claude              │ 5h Window                        │ 23%   │ 4h 30m │ ✓ OK   │
-│                     │ 7d Window                        │ 4%    │ 5d     │        │
-╰─────────────────────┴──────────────────────────────────┴───────┴────────┴────────╯
+╭─────────────────────┬──────────────────┬───────┬────────┬────────╮
+│ Provider            │ Model            │ Usage │ Resets │ Status │
+╞═════════════════════╪══════════════════╪═══════╪════════╪════════╡
+│ Gemini              │ Claude Models    │ 0%    │ 6d     │ ✓ OK   │
+│ jsribeiro@gmail.com │ Gemini Flash     │ 0%    │ 6d     │ ✓ OK   │
+│                     │ Gemini 3 Pro     │ 0%    │ 6d     │ ✓ OK   │
+├─────────────────────┼──────────────────┼───────┼────────┼────────┤
+│ Codex               │ Primary          │ 9%    │ 2h 1m  │ ✓ OK   │
+│                     │ Secondary        │ 3%    │ 73h 41m│ ✓ OK   │
+├─────────────────────┼──────────────────┼───────┼────────┼────────┤
+│ Claude              │ 5h Window        │ 23%   │ 4h 30m │ ✓ OK   │
+│                     │ 7d Window        │ 4%    │ 5d     │ ✓ OK   │
+╰─────────────────────┴──────────────────┴───────┴────────┴────────╯
 ```
 
 **Color Coding:**
@@ -428,25 +427,28 @@ Machine-readable, useful for scripting and CI/CD.
   "timestamp": "2026-02-01T14:30:00Z",
   "providers": [
     {
-      "name": "gemini",
-      "account": "user@example.com",
-      "active": true,
-      "models": [
+      "type": "gemini",
+      "accounts": [
         {
-          "model": "gemini-2.0-flash",
-          "remaining_percent": 100,
-          "reset_time": "2026-02-01T17:05:02Z"
-        },
-        {
-          "model": "gemini-2.5-pro",
-          "remaining_percent": 85,
-          "reset_time": "2026-02-01T17:05:02Z"
+          "email": "user@example.com",
+          "is_active": true,
+          "models": [
+            {
+              "model": "Gemini Flash",
+              "remaining_percent": 100.0,
+              "reset_time": "2026-02-01T17:05:02Z"
+            },
+            {
+              "model": "Gemini 3 Pro",
+              "remaining_percent": 85.0,
+              "reset_time": "2026-02-01T17:05:02Z"
+            }
+          ]
         }
-      ],
-      "status": "ok"
+      ]
     },
     {
-      "name": "codex",
+      "type": "codex",
       "plan": "pro",
       "primary_window": {
         "used_percent": 9,
@@ -455,20 +457,18 @@ Machine-readable, useful for scripting and CI/CD.
       "secondary_window": {
         "used_percent": 3,
         "resets_in_seconds": 265266
-      },
-      "status": "ok"
+      }
     },
     {
-      "name": "copilot",
+      "type": "copilot",
       "plan": "individual_pro",
       "premium_remaining": -3821,
       "premium_entitlement": 1500,
       "overage_permitted": true,
-      "quota_reset_date": "2026-02-01",
-      "status": "warning"
+      "quota_reset_date": "2026-02-01"
     },
     {
-      "name": "claude",
+      "type": "claude",
       "five_hour": {
         "utilization": 23.0,
         "resets_at": "2026-01-29T20:00:00Z"
@@ -477,7 +477,9 @@ Machine-readable, useful for scripting and CI/CD.
         "utilization": 4.0,
         "resets_at": "2026-02-05T15:00:00Z"
       },
-      "status": "ok"
+      "seven_day_sonnet": null,
+      "seven_day_opus": null,
+      "extra_usage_enabled": false
     }
   ]
 }
