@@ -25,10 +25,16 @@ impl CopilotProvider {
         client: &Client,
         token: &str,
         timeout: Duration,
+        verbose: bool,
     ) -> Option<CopilotOverageCharges> {
         // First, get the authenticated user's login
+        let user_url = "https://api.github.com/user";
+        if verbose {
+            eprintln!("[copilot] GET {}", user_url);
+        }
+
         let user_response = match client
-            .get("https://api.github.com/user")
+            .get(user_url)
             .header("Authorization", format!("token {}", token))
             .header("Accept", "application/json")
             .header("User-Agent", "ocu/0.1.0")
@@ -44,10 +50,15 @@ impl CopilotProvider {
             }
         };
 
-        if !user_response.status().is_success() {
+        let status = user_response.status();
+        if verbose {
+            eprintln!("[copilot] {} {}", status.as_u16(), status.canonical_reason().unwrap_or(""));
+        }
+
+        if !status.is_success() {
             eprintln!(
                 "Warning: GitHub user API returned status {}",
-                user_response.status()
+                status
             );
             return None;
         }
@@ -74,6 +85,10 @@ impl CopilotProvider {
             username
         );
 
+        if verbose {
+            eprintln!("[copilot] GET {}", billing_url);
+        }
+
         let billing_response = match client
             .get(&billing_url)
             .header("Authorization", format!("token {}", token))
@@ -92,6 +107,10 @@ impl CopilotProvider {
         };
 
         let status = billing_response.status();
+        if verbose {
+            eprintln!("[copilot] {} {}", status.as_u16(), status.canonical_reason().unwrap_or(""));
+        }
+
         if !status.is_success() {
             if status.as_u16() == 403 {
                 eprintln!(
@@ -152,7 +171,7 @@ impl Provider for CopilotProvider {
             .unwrap_or(false)
     }
 
-    async fn fetch(&self, timeout: Duration) -> Result<ProviderData> {
+    async fn fetch(&self, timeout: Duration, verbose: bool) -> Result<ProviderData> {
         let auth = self
             .auth_manager
             .read_opencode_auth()?
@@ -165,8 +184,13 @@ impl Provider for CopilotProvider {
         let client = Client::new();
 
         // Fetch quota data
+        let url = "https://api.github.com/copilot_internal/user";
+        if verbose {
+            eprintln!("[copilot] GET {}", url);
+        }
+
         let response = client
-            .get("https://api.github.com/copilot_internal/user")
+            .get(url)
             .header("Authorization", format!("token {}", copilot_auth.access))
             .header("Accept", "application/json")
             .header("User-Agent", "ocu/0.1.0")
@@ -176,8 +200,12 @@ impl Provider for CopilotProvider {
             .send()
             .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
+        let status = response.status();
+        if verbose {
+            eprintln!("[copilot] {} {}", status.as_u16(), status.canonical_reason().unwrap_or(""));
+        }
+
+        if !status.is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(QuotaError::ApiError(format!(
                 "Copilot API error ({}): {}",
@@ -189,7 +217,7 @@ impl Provider for CopilotProvider {
         let premium = &usage.quota_snapshots.premium_interactions;
 
         // Try to fetch billing/overage data (may fail if token doesn't have permission)
-        let overage_charges = self.fetch_billing_data(&client, &copilot_auth.access, timeout).await;
+        let overage_charges = self.fetch_billing_data(&client, &copilot_auth.access, timeout, verbose).await;
 
         let data = CopilotData {
             plan: usage.copilot_plan,

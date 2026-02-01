@@ -91,6 +91,8 @@ async fn main() -> ExitCode {
 
     println!("Fetching quota information...\n");
 
+    let verbose = args.verbose;
+
     if args.concurrent {
         // Concurrent fetching - only fetch configured providers
         let futures = providers.iter()
@@ -99,7 +101,7 @@ async fn main() -> ExitCode {
                 let timeout = timeout;
                 async move {
                     let name = provider.name();
-                    match provider.fetch(timeout).await {
+                    match provider.fetch(timeout, verbose).await {
                         Ok(data) => Ok(data),
                         Err(e) => Err((name, e)),
                     }
@@ -125,7 +127,7 @@ async fn main() -> ExitCode {
                 continue;
             }
 
-            match provider.fetch(timeout).await {
+            match provider.fetch(timeout, verbose).await {
                 Ok(data) => results.push(data),
                 Err(e) => {
                     eprintln!("Warning: {} failed: {}", name, e);

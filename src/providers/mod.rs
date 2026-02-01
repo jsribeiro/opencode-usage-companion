@@ -20,7 +20,7 @@ pub trait Provider: Send + Sync {
     fn is_configured(&self) -> bool;
 
     /// Fetch quota/usage data from the provider
-    async fn fetch(&self, timeout: Duration) -> Result<ProviderData>;
+    async fn fetch(&self, timeout: Duration, verbose: bool) -> Result<ProviderData>;
 }
 
 /// Data returned by any provider

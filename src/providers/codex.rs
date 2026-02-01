@@ -31,7 +31,7 @@ impl Provider for CodexProvider {
             .unwrap_or(false)
     }
 
-    async fn fetch(&self, timeout: Duration) -> Result<ProviderData> {
+    async fn fetch(&self, timeout: Duration, verbose: bool) -> Result<ProviderData> {
         let auth = self
             .auth_manager
             .read_opencode_auth()?
@@ -41,9 +41,14 @@ impl Provider for CodexProvider {
             .openai
             .ok_or_else(|| QuotaError::ProviderNotConfigured("codex (no openai token)".to_string()))?;
 
+        let url = "https://chatgpt.com/backend-api/wham/usage";
+        if verbose {
+            eprintln!("[codex] GET {}", url);
+        }
+
         let client = Client::new();
         let mut request = client
-            .get("https://chatgpt.com/backend-api/wham/usage")
+            .get(url)
             .header("Authorization", format!("Bearer {}", openai_auth.access))
             .timeout(timeout);
 
@@ -54,8 +59,12 @@ impl Provider for CodexProvider {
 
         let response = request.send().await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
+        let status = response.status();
+        if verbose {
+            eprintln!("[codex] {} {}", status.as_u16(), status.canonical_reason().unwrap_or(""));
+        }
+
+        if !status.is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(QuotaError::ApiError(format!(
                 "Codex API error ({}): {}",

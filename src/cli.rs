@@ -24,6 +24,10 @@ pub struct Args {
     /// Disable colored output
     #[arg(long)]
     pub no_color: bool,
+
+    /// Show verbose output (API requests and responses)
+    #[arg(short, long)]
+    pub verbose: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum, PartialEq)]

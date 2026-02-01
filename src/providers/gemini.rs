@@ -66,9 +66,14 @@ impl GeminiProvider {
     }
 
     /// Refresh access token using refresh token
-    async fn refresh_access_token(&self, refresh_token: &str) -> Result<String> {
+    async fn refresh_access_token(&self, refresh_token: &str, verbose: bool) -> Result<String> {
         let client = Client::new();
-        
+
+        let url = "https://oauth2.googleapis.com/token";
+        if verbose {
+            eprintln!("[gemini] POST {}", url);
+        }
+
         let params = [
             ("client_id", ANTIGRAVITY_CLIENT_ID),
             ("client_secret", ANTIGRAVITY_CLIENT_SECRET),
@@ -77,13 +82,18 @@ impl GeminiProvider {
         ];
 
         let response = client
-            .post("https://oauth2.googleapis.com/token")
+            .post(url)
             .form(&params)
             .timeout(Duration::from_secs(10))
             .send()
             .await?;
 
-        if !response.status().is_success() {
+        let status = response.status();
+        if verbose {
+            eprintln!("[gemini] {} {}", status.as_u16(), status.canonical_reason().unwrap_or(""));
+        }
+
+        if !status.is_success() {
             let error_text = response.text().await?;
             return Err(QuotaError::TokenRefreshError(format!(
                 "Google OAuth refresh failed: {}",
@@ -96,9 +106,14 @@ impl GeminiProvider {
     }
 
     /// Load code assist to get project ID
-    async fn load_code_assist(&self, access_token: &str, timeout: Duration) -> Result<LoadCodeAssistResponse> {
+    async fn load_code_assist(&self, access_token: &str, timeout: Duration, verbose: bool) -> Result<LoadCodeAssistResponse> {
         let client = Client::new();
-        
+
+        let url = format!("{}/v1internal:loadCodeAssist", ANTIGRAVITY_ENDPOINT_PROD);
+        if verbose {
+            eprintln!("[gemini] POST {}", url);
+        }
+
         let metadata = serde_json::json!({
             "ideType": "ANTIGRAVITY",
             "platform": "PLATFORM_UNSPECIFIED",
@@ -106,7 +121,7 @@ impl GeminiProvider {
         });
 
         let response = client
-            .post(format!("{}/v1internal:loadCodeAssist", ANTIGRAVITY_ENDPOINT_PROD))
+            .post(&url)
             .header("Authorization", format!("Bearer {}", access_token))
             .header("Content-Type", "application/json")
             .header("User-Agent", format!("antigravity/{} {}", ANTIGRAVITY_VERSION, get_platform()))
@@ -116,8 +131,12 @@ impl GeminiProvider {
             .send()
             .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
+        let status = response.status();
+        if verbose {
+            eprintln!("[gemini] {} {}", status.as_u16(), status.canonical_reason().unwrap_or(""));
+        }
+
+        if !status.is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(QuotaError::ApiError(format!(
                 "loadCodeAssist failed ({}): {}",
@@ -149,9 +168,15 @@ impl GeminiProvider {
         access_token: &str,
         project_id: Option<&str>,
         timeout: Duration,
+        verbose: bool,
     ) -> Result<FetchAvailableModelsResponse> {
         let client = Client::new();
-        
+
+        let url = format!("{}/v1internal:fetchAvailableModels", ANTIGRAVITY_ENDPOINT_PROD);
+        if verbose {
+            eprintln!("[gemini] POST {}", url);
+        }
+
         let payload = if let Some(pid) = project_id {
             serde_json::json!({ "project": format!("projects/{}", pid) })
         } else {
@@ -159,7 +184,7 @@ impl GeminiProvider {
         };
 
         let response = client
-            .post(format!("{}/v1internal:fetchAvailableModels", ANTIGRAVITY_ENDPOINT_PROD))
+            .post(&url)
             .header("Authorization", format!("Bearer {}", access_token))
             .header("Content-Type", "application/json")
             .header("User-Agent", format!("antigravity/{} {}", ANTIGRAVITY_VERSION, get_platform()))
@@ -169,8 +194,12 @@ impl GeminiProvider {
             .send()
             .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
+        let status = response.status();
+        if verbose {
+            eprintln!("[gemini] {} {}", status.as_u16(), status.canonical_reason().unwrap_or(""));
+        }
+
+        if !status.is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(QuotaError::ApiError(format!(
                 "fetchAvailableModels failed ({}): {}",
@@ -188,8 +217,13 @@ impl GeminiProvider {
         account: &AntigravityAccount,
         is_active: bool,
         timeout: Duration,
+        verbose: bool,
     ) -> Result<GeminiAccountData> {
-        let access_token = self.refresh_access_token(&account.refresh_token).await?;
+        if verbose {
+            eprintln!("[gemini] Fetching quota for {}", account.email);
+        }
+
+        let access_token = self.refresh_access_token(&account.refresh_token, verbose).await?;
 
         // Get project ID - either from account or from loadCodeAssist
         let project_id = account.project_id.clone()
@@ -197,7 +231,7 @@ impl GeminiProvider {
 
         // If no project ID, try to get it from loadCodeAssist
         let project_id = if project_id.is_none() {
-            match self.load_code_assist(&access_token, timeout).await {
+            match self.load_code_assist(&access_token, timeout, verbose).await {
                 Ok(assist) => self.extract_project_id(&assist.cloudaicompanion_project),
                 Err(_) => None,
             }
@@ -205,7 +239,7 @@ impl GeminiProvider {
             project_id
         };
 
-        let models_response = self.fetch_available_models(&access_token, project_id.as_deref(), timeout).await?;
+        let models_response = self.fetch_available_models(&access_token, project_id.as_deref(), timeout, verbose).await?;
 
         let now = Utc::now();
 
@@ -326,7 +360,7 @@ impl Provider for GeminiProvider {
             .unwrap_or(false)
     }
 
-    async fn fetch(&self, timeout: Duration) -> Result<ProviderData> {
+    async fn fetch(&self, timeout: Duration, verbose: bool) -> Result<ProviderData> {
         // Read antigravity accounts
         let antigravity = self
             .auth_manager
@@ -339,12 +373,16 @@ impl Provider for GeminiProvider {
             ));
         }
 
+        if verbose {
+            eprintln!("[gemini] Found {} account(s)", antigravity.accounts.len());
+        }
+
         // Fetch quota for all accounts
         let mut account_data: Vec<GeminiAccountData> = Vec::new();
 
         for (idx, account) in antigravity.accounts.iter().enumerate() {
             let is_active = idx == antigravity.active_index;
-            match self.fetch_account_quota(account, is_active, timeout).await {
+            match self.fetch_account_quota(account, is_active, timeout, verbose).await {
                 Ok(data) => account_data.push(data),
                 Err(e) => {
                     // Log error but continue with other accounts

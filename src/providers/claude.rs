@@ -32,7 +32,7 @@ impl Provider for ClaudeProvider {
             .unwrap_or(false)
     }
 
-    async fn fetch(&self, timeout: Duration) -> Result<ProviderData> {
+    async fn fetch(&self, timeout: Duration, verbose: bool) -> Result<ProviderData> {
         let auth = self
             .auth_manager
             .read_opencode_auth()?
@@ -42,17 +42,26 @@ impl Provider for ClaudeProvider {
             .anthropic
             .ok_or_else(|| QuotaError::ProviderNotConfigured("claude (no token)".to_string()))?;
 
+        let url = "https://api.anthropic.com/api/oauth/usage";
+        if verbose {
+            eprintln!("[claude] GET {}", url);
+        }
+
         let client = Client::new();
         let response = client
-            .get("https://api.anthropic.com/api/oauth/usage")
+            .get(url)
             .header("Authorization", format!("Bearer {}", anthropic_auth.access))
             .header("anthropic-beta", "oauth-2025-04-20")
             .timeout(timeout)
             .send()
             .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
+        let status = response.status();
+        if verbose {
+            eprintln!("[claude] {} {}", status.as_u16(), status.canonical_reason().unwrap_or(""));
+        }
+
+        if !status.is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(QuotaError::ApiError(format!(
                 "Claude API error ({}): {}",
