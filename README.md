@@ -1,6 +1,6 @@
 # opencode-usage-companion
 
-**Command:** `ocu`  
+**Command:** `ocu`
 **Purpose:** Check AI provider quotas using existing OpenCode authentication
 
 ## Overview
@@ -11,11 +11,10 @@ A fast, cross-platform Rust CLI tool that queries AI provider quotas and usage b
 
 - **Zero Configuration**: Automatically detects and uses OpenCode's existing auth tokens
 - **Multi-Provider Support**: Gemini/Antigravity, Codex, Copilot, Claude
-- **Cross-Platform**: Windows (PowerShell), macOS, Linux
+- **Cross-Platform**: Windows, macOS, Linux
 - **Multiple Output Formats**: Table (default), JSON, Simple text
 - **Colored Output**: Visual indicators for quota levels (with `--no-color` option)
-- **Fast**: Concurrent provider querying support
-- **Standalone Binary**: Single executable, no runtime dependencies
+- **Concurrent Querying**: Optional parallel provider queries for faster results
 
 ## Installation
 
@@ -117,7 +116,8 @@ ocu -t 5
 
 ## Example Output
 
-### Table Format (with colors and rounded corners)
+### Table Format
+
 ```
 ╭─────────────────────┬──────────────────────────────────┬───────┬────────┬────────╮
 │ Provider            │ Model                            │ Usage │ Resets │ Status │
@@ -134,30 +134,35 @@ ocu -t 5
 ╰─────────────────────┴──────────────────────────────────┴───────┴────────┴────────╯
 ```
 
-**Features:**
-- **Rounded corners** for modern appearance
-- **Double line** after header (╞═══╡)
-- **Cell spanning**: Provider names span multiple rows
-- **Status icons**: ✓ OK, ⚠️ WARNING, ✗ ERROR
-- **Color coding**: Usage percentages shown in green (healthy), yellow (warning), or red (critical)
-- **Inverted Gemini usage**: Shows % used (0% = all quota free) for consistency with other providers
+- **Usage column**: Shows percentage of quota consumed (0% = all quota available, 100% = quota exhausted)
+- **Color coding**: Green (healthy), yellow (warning >50%), red (critical >80%)
+- **Status icons**: `✓ OK`, `⚠️ WARNING`, `✗ ERROR`
 
 ### JSON Format
+
 ```json
 {
-  "timestamp": "2026-02-01T14:30:00Z",
+  "timestamp": "2025-01-15T14:30:00Z",
   "providers": [
     {
       "type": "gemini",
-      "account": "user@example.com",
-      "active": true,
+      "account_email": "user@example.com",
+      "is_active": true,
       "models": [
-        {"model": "gemini-2.0-flash", "remaining_percent": 100}
+        {"model": "gemini-2.0-flash", "remaining_percent": 100.0, "reset_time": "2025-01-22T00:00:00Z"}
       ]
+    },
+    {
+      "type": "codex",
+      "plan": "plus",
+      "primary_window": {"used_percent": 9, "resets_in_seconds": 7260},
+      "secondary_window": {"used_percent": 3, "resets_in_seconds": 265260}
     }
   ]
 }
 ```
+
+Note: JSON output uses raw API values (`remaining_percent` for Gemini, `used_percent` for others).
 
 ## Development
 
@@ -166,7 +171,7 @@ Built with:
 - Tokio (async runtime)
 - Reqwest (HTTP client)
 - Clap (CLI parsing)
-- tabled 0.20 (table formatting with colors)
+- tabled (table formatting)
 - Serde (JSON serialization)
 
 ## License
