@@ -1,0 +1,59 @@
+[package]
+name = "opencode-usage-companion"
+version = "0.1.0"
+edition = "2021"
+authors = ["jsribeiro"]
+description = "OpenCode Usage Companion - Check AI provider quotas using existing OpenCode authentication"
+license = "MIT"
+repository = "https://github.com/jsribeiro/opencode-usage-companion"
+keywords = ["opencode", "ai", "quota", "usage", "cli"]
+categories = ["command-line-utilities"]
+rust-version = "1.70"
+
+[[bin]]
+name = "ocu"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# CLI parsing
+clap = { version = "4.5", features = ["derive"] }
+
+# Table formatting with cell spanning and color support
+tabled = { version = "0.20" }
+
+# Terminal colors
+ansi-str = "0.9"
+colored = "2.1"
+
+# Date/time handling
+chrono = { version = "0.4", features = ["serde", "clock"], default-features = false }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Cross-platform paths
+dirs = "5.0"
+
+# Async trait support
+async-trait = "0.1"
+
+# Futures for join_all
+futures = "0.3"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
