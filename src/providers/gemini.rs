@@ -21,6 +21,39 @@ const _ANTIGRAVITY_ENDPOINT_AUTOPUSH: &str = "https://autopush-cloudcode-pa.sand
 /// Default headers for Antigravity API requests
 const ANTIGRAVITY_VERSION: &str = "1.15.8";
 
+/// Get platform string for User-Agent header
+fn get_platform() -> &'static str {
+    #[cfg(target_os = "windows")]
+    {
+        #[cfg(target_arch = "x86_64")]
+        return "windows/x64";
+        #[cfg(target_arch = "aarch64")]
+        return "windows/arm64";
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        return "windows/unknown";
+    }
+    #[cfg(target_os = "macos")]
+    {
+        #[cfg(target_arch = "x86_64")]
+        return "darwin/x64";
+        #[cfg(target_arch = "aarch64")]
+        return "darwin/arm64";
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        return "darwin/unknown";
+    }
+    #[cfg(target_os = "linux")]
+    {
+        #[cfg(target_arch = "x86_64")]
+        return "linux/x64";
+        #[cfg(target_arch = "aarch64")]
+        return "linux/arm64";
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        return "linux/unknown";
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    return "unknown/unknown";
+}
+
 pub struct GeminiProvider {
     auth_manager: AuthManager,
 }
@@ -76,7 +109,7 @@ impl GeminiProvider {
             .post(format!("{}/v1internal:loadCodeAssist", ANTIGRAVITY_ENDPOINT_PROD))
             .header("Authorization", format!("Bearer {}", access_token))
             .header("Content-Type", "application/json")
-            .header("User-Agent", format!("antigravity/{} windows/arm64", ANTIGRAVITY_VERSION))
+            .header("User-Agent", format!("antigravity/{} {}", ANTIGRAVITY_VERSION, get_platform()))
             .header("X-Goog-Api-Client", "google-cloud-sdk vscode_cloudshelleditor/0.1")
             .json(&serde_json::json!({ "metadata": metadata }))
             .timeout(timeout)
@@ -129,7 +162,7 @@ impl GeminiProvider {
             .post(format!("{}/v1internal:fetchAvailableModels", ANTIGRAVITY_ENDPOINT_PROD))
             .header("Authorization", format!("Bearer {}", access_token))
             .header("Content-Type", "application/json")
-            .header("User-Agent", format!("antigravity/{} windows/arm64", ANTIGRAVITY_VERSION))
+            .header("User-Agent", format!("antigravity/{} {}", ANTIGRAVITY_VERSION, get_platform()))
             .header("X-Goog-Api-Client", "google-cloud-sdk vscode_cloudshelleditor/0.1")
             .json(&payload)
             .timeout(timeout)
@@ -253,9 +286,13 @@ impl Provider for GeminiProvider {
             ));
         }
 
-        // For now, fetch the first account
+        // For now, fetch the active account
         // TODO: Support multiple accounts like the TypeScript plugin does
-        let account = &accounts.accounts[accounts.active_index];
+        let account = accounts.accounts.get(accounts.active_index)
+            .or_else(|| accounts.accounts.first())
+            .ok_or_else(|| QuotaError::ProviderNotConfigured(
+                "gemini (invalid active account index)".to_string(),
+            ))?;
 
         let data = self
             .fetch_account_quota(account, timeout)
