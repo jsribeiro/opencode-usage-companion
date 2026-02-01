@@ -46,6 +46,7 @@ impl Provider for CopilotProvider {
             .get("https://api.github.com/copilot_internal/user")
             .header("Authorization", format!("token {}", copilot_auth.access))
             .header("Accept", "application/json")
+            .header("User-Agent", "ocu/0.1.0")
             .header("Editor-Version", "vscode/1.96.2")
             .header("X-Github-Api-Version", "2025-04-01")
             .timeout(timeout)
