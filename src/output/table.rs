@@ -155,8 +155,8 @@ fn add_provider_rows(
             vec![(start_row, 2)]
         }
         ProviderData::Copilot(copilot) => {
-            add_copilot_rows(builder, copilot, no_color, start_row, cell_colors);
-            vec![(start_row, 1)]
+            let row_count = add_copilot_rows(builder, copilot, no_color, start_row, cell_colors);
+            vec![(start_row, row_count)]
         }
         ProviderData::Claude(claude) => {
             add_claude_rows(builder, claude, no_color, start_row, cell_colors);
@@ -329,7 +329,7 @@ fn add_copilot_rows(
     no_color: bool,
     start_row: usize,
     cell_colors: &mut Vec<(usize, usize, Color)>
-) {
+) -> usize {
     let name = "Copilot".to_string();
 
     // Calculate usage percentage (inverted from remaining to align with other providers)
@@ -356,6 +356,28 @@ fn add_copilot_rows(
         cell_colors.push((start_row, 2, get_usage_color(used_percent)));
         cell_colors.push((start_row, 4, get_status_color(row_status)));
     }
+
+    // Add overage row if billing data is available and has charges
+    if let Some(ref overage) = data.overage_charges {
+        if overage.quantity > 0 || overage.amount > 0.0 {
+            let overage_str = format!("${:.2}", overage.amount);
+            builder.push_record([
+                String::new(),
+                "Overage Charges".to_string(),
+                overage_str,
+                format!("{} reqs", overage.quantity),
+                "".to_string(),
+            ]);
+
+            if !no_color {
+                // Show overage amount in red if there are charges
+                cell_colors.push((start_row + 1, 2, Color::FG_RED));
+            }
+            return 2;
+        }
+    }
+
+    1
 }
 
 fn add_claude_rows(

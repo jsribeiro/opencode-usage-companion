@@ -75,6 +75,17 @@ pub struct CopilotData {
     pub premium_remaining: i64,
     pub overage_permitted: bool,
     pub quota_reset_date: String,
+    /// Overage charges this month (if available)
+    pub overage_charges: Option<CopilotOverageCharges>,
+}
+
+/// Copilot overage billing data
+#[derive(Debug, Clone, Serialize)]
+pub struct CopilotOverageCharges {
+    /// Number of overage requests
+    pub quantity: i64,
+    /// Total amount charged (USD)
+    pub amount: f64,
 }
 
 /// Claude provider data
