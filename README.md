@@ -117,18 +117,30 @@ ocu -t 5
 
 ## Example Output
 
-### Table Format
+### Table Format (with colors and rounded corners)
 ```
-┌─────────────┬─────────────┬─────────────┬─────────────┬────────┐
-│ Provider    │ Quota Info  │ Resets In   │ Status      │
-├─────────────┼─────────────┼─────────────┼─────────────┼────────┤
-│ Gemini      │ 2.0: 100%   │ 2h 15m      │ OK          │
-│ user@email  │ 2.5 Pro:85% │             │             │
-├─────────────┼─────────────┼─────────────┼─────────────┼────────┤
-│ Claude      │ 5h: 23%     │ 2h 15m      │ OK          │
-│             │ 7d: 4%      │             │             │
-└─────────────┴─────────────┴─────────────┴─────────────┴────────┘
+╭─────────────────────┬──────────────────────────────────┬───────┬────────┬────────╮
+│ Provider            │ Model                            │ Usage │ Resets │ Status │
+╞═════════════════════╪══════════════════════════════════╪═══════╪════════╪════════╡
+│ Gemini              │ MODEL_CLAUDE_4_5_SONNET          │ 0%    │ 6d     │ ✓ OK   │
+│ user@example.com    │ MODEL_CLAUDE_4_5_SONNET_THINKING │ 0%    │ 6d     │        │
+│                     │ MODEL_GPT_4O                     │ 0%    │ 6d     │        │
+├─────────────────────┼──────────────────────────────────┼───────┼────────┼────────┤
+│ Codex               │ Primary                          │ 9%    │ 2h 1m  │ ✓ OK   │
+│                     │ Secondary                        │ 3%    │ 73h 41m│        │
+├─────────────────────┼──────────────────────────────────┼───────┼────────┼────────┤
+│ Claude              │ 5h Window                        │ 23%   │ 4h 30m │ ✓ OK   │
+│                     │ 7d Window                        │ 4%    │ 5d     │        │
+╰─────────────────────┴──────────────────────────────────┴───────┴────────┴────────╯
 ```
+
+**Features:**
+- **Rounded corners** for modern appearance
+- **Double line** after header (╞═══╡)
+- **Cell spanning**: Provider names span multiple rows
+- **Status icons**: ✓ OK, ⚠️ WARNING, ✗ ERROR
+- **Color coding**: Usage percentages shown in green (healthy), yellow (warning), or red (critical)
+- **Inverted Gemini usage**: Shows % used (0% = all quota free) for consistency with other providers
 
 ### JSON Format
 ```json
@@ -154,6 +166,7 @@ Built with:
 - Tokio (async runtime)
 - Reqwest (HTTP client)
 - Clap (CLI parsing)
+- tabled 0.20 (table formatting with colors)
 - Serde (JSON serialization)
 
 ## License
