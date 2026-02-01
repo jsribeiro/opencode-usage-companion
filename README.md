@@ -96,7 +96,7 @@ ocu -t 5
 - Auth: `~/.local/share/opencode/auth.json`
 
 ### Copilot (GitHub)
-- Premium requests with overage tracking
+- Premium requests with overage request count
 - Auth: `~/.local/share/opencode/auth.json`
 
 ### Claude (Anthropic)

@@ -1,5 +1,10 @@
-use crate::providers::{ClaudeData, CodexData, CopilotData, GeminiAccountData, GeminiData, ProviderData, ProviderStatus};
-use tabled::{builder::Builder, settings::Style, settings::Color, settings::span::Span, settings::style::HorizontalLine, settings::themes::BorderCorrection};
+use crate::providers::{
+    ClaudeData, CodexData, CopilotData, GeminiAccountData, GeminiData, ProviderData, ProviderStatus,
+};
+use tabled::{
+    builder::Builder, settings::span::Span, settings::style::HorizontalLine,
+    settings::themes::BorderCorrection, settings::Color, settings::Style,
+};
 
 /// Format data as a pretty table with UTF-8 borders
 /// Features:
@@ -24,7 +29,13 @@ pub fn format_table(data: &[ProviderData], no_color: bool) -> String {
     let mut current_row = 1usize; // Start after header
 
     for provider_data in data {
-        let spans = add_provider_rows(&mut builder, provider_data, no_color, current_row, &mut cell_colors);
+        let spans = add_provider_rows(
+            &mut builder,
+            provider_data,
+            no_color,
+            current_row,
+            &mut cell_colors,
+        );
         for (start, count) in spans {
             if count > 0 {
                 section_spans.push((start, count));
@@ -53,10 +64,9 @@ pub fn format_table(data: &[ProviderData], no_color: bool) -> String {
             table.with(Style::rounded().horizontals([(1, double_line)]));
         }
         1 => {
-            table.with(Style::rounded().horizontals([
-                (1, double_line),
-                (separator_rows[0], dotted_line),
-            ]));
+            table.with(
+                Style::rounded().horizontals([(1, double_line), (separator_rows[0], dotted_line)]),
+            );
         }
         2 => {
             table.with(Style::rounded().horizontals([
@@ -146,10 +156,12 @@ fn add_provider_rows(
     data: &ProviderData,
     no_color: bool,
     start_row: usize,
-    cell_colors: &mut Vec<(usize, usize, Color)>
+    cell_colors: &mut Vec<(usize, usize, Color)>,
 ) -> Vec<(usize, usize)> {
     match data {
-        ProviderData::Gemini(gemini) => add_gemini_rows(builder, gemini, no_color, start_row, cell_colors),
+        ProviderData::Gemini(gemini) => {
+            add_gemini_rows(builder, gemini, no_color, start_row, cell_colors)
+        }
         ProviderData::Codex(codex) => {
             add_codex_rows(builder, codex, no_color, start_row, cell_colors);
             vec![(start_row, 2)]
@@ -171,7 +183,7 @@ fn add_gemini_rows(
     data: &GeminiData,
     no_color: bool,
     start_row: usize,
-    cell_colors: &mut Vec<(usize, usize, Color)>
+    cell_colors: &mut Vec<(usize, usize, Color)>,
 ) -> Vec<(usize, usize)> {
     let mut spans: Vec<(usize, usize)> = Vec::new();
     let mut current_row = start_row;
@@ -193,7 +205,8 @@ fn add_gemini_rows(
 
     for account in &data.accounts {
         let account_start = current_row;
-        let row_count = add_gemini_account_rows(builder, account, no_color, current_row, cell_colors);
+        let row_count =
+            add_gemini_account_rows(builder, account, no_color, current_row, cell_colors);
         if row_count > 0 {
             spans.push((account_start, row_count));
             current_row += row_count;
@@ -233,7 +246,8 @@ fn add_gemini_account_rows(
     // Add one row per model with per-model status
     // Invert usage to show % USED (like other providers) instead of % remaining
     for (i, model) in account.models.iter().enumerate() {
-        let reset_str = model.reset_time
+        let reset_str = model
+            .reset_time
             .map(|t| format_reset_time(t))
             .unwrap_or_else(|| "-".to_string());
 
@@ -280,7 +294,7 @@ fn add_codex_rows(
     data: &CodexData,
     no_color: bool,
     start_row: usize,
-    cell_colors: &mut Vec<(usize, usize, Color)>
+    cell_colors: &mut Vec<(usize, usize, Color)>,
 ) {
     let name = "Codex".to_string();
 
@@ -328,7 +342,7 @@ fn add_copilot_rows(
     data: &CopilotData,
     no_color: bool,
     start_row: usize,
-    cell_colors: &mut Vec<(usize, usize, Color)>
+    cell_colors: &mut Vec<(usize, usize, Color)>,
 ) -> usize {
     let name = "Copilot".to_string();
 
@@ -357,24 +371,21 @@ fn add_copilot_rows(
         cell_colors.push((start_row, 4, get_status_color(row_status)));
     }
 
-    // Add overage row if billing data is available and has charges
-    if let Some(ref overage) = data.overage_charges {
-        if overage.quantity > 0 || overage.amount > 0.0 {
-            let overage_str = format!("${:.2}", overage.amount);
-            builder.push_record([
-                String::new(),
-                "Overage Charges".to_string(),
-                overage_str,
-                format!("{} reqs", overage.quantity),
-                "".to_string(),
-            ]);
+    // Add overage row if the API reported overage requests
+    if data.overage_count > 0 {
+        let overage_str = format!("{} reqs", data.overage_count);
+        builder.push_record([
+            String::new(),
+            "Overage Requests".to_string(),
+            overage_str,
+            "".to_string(),
+            "".to_string(),
+        ]);
 
-            if !no_color {
-                // Show overage amount in red if there are charges
-                cell_colors.push((start_row + 1, 2, Color::FG_RED));
-            }
-            return 2;
+        if !no_color {
+            cell_colors.push((start_row + 1, 2, Color::FG_RED));
         }
+        return 2;
     }
 
     1
@@ -385,14 +396,16 @@ fn add_claude_rows(
     data: &ClaudeData,
     no_color: bool,
     start_row: usize,
-    cell_colors: &mut Vec<(usize, usize, Color)>
+    cell_colors: &mut Vec<(usize, usize, Color)>,
 ) {
     let name = "Claude".to_string();
 
     // 5-hour window with per-window status
     let five_h_percent = data.five_hour.utilization as i32;
     let five_h_usage = format!("{}%", five_h_percent);
-    let five_h_reset = data.five_hour.resets_at
+    let five_h_reset = data
+        .five_hour
+        .resets_at
         .map(|t| format_reset_time(t))
         .unwrap_or_else(|| "-".to_string());
     let five_h_status = get_row_status(five_h_percent);
@@ -413,7 +426,9 @@ fn add_claude_rows(
     // 7-day window with per-window status
     let seven_d_percent = data.seven_day.utilization as i32;
     let seven_d_usage = format!("{}%", seven_d_percent);
-    let seven_d_reset = data.seven_day.resets_at
+    let seven_d_reset = data
+        .seven_day
+        .resets_at
         .map(|t| format_reset_time(t))
         .unwrap_or_else(|| "-".to_string());
     let seven_d_status = get_row_status(seven_d_percent);

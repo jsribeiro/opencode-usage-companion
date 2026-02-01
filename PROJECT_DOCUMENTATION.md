@@ -172,7 +172,8 @@ Client Secret: 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
     "premium_interactions": {
       "entitlement": 1500,
       "remaining": -3821,
-      "overage_permitted": true
+      "overage_permitted": true,
+      "overage_count": 3821
     }
   }
 }
@@ -181,13 +182,14 @@ Client Secret: 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
 **Key Points:**
 - Negative `remaining` = overage used
 - `overage_permitted` = can continue using (may cost extra)
+- `overage_count` = number of premium overage requests
 - `entitlement` = monthly quota limit
 - Chat and completions show -1 (unlimited on most plans)
 
 **Display:**
 - Plan type
 - Premium: used/entitlement (e.g., "5321/1500")
-- Overage indicator if remaining < 0
+- Overage request count when available
 - Reset date
 - Warning symbol (⚠️) if over quota
 
@@ -465,6 +467,7 @@ Machine-readable, useful for scripting and CI/CD.
       "premium_remaining": -3821,
       "premium_entitlement": 1500,
       "overage_permitted": true,
+      "overage_count": 3821,
       "quota_reset_date": "2026-02-01"
     },
     {

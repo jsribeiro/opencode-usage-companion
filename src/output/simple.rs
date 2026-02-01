@@ -77,12 +77,12 @@ fn format_codex_simple(data: &CodexData) -> String {
 fn format_copilot_simple(data: &CopilotData) -> String {
     let used = data.premium_entitlement - data.premium_remaining;
 
-    if data.premium_remaining < 0 {
+    if data.premium_remaining < 0 || data.overage_count > 0 {
         format!(
-            "Copilot: used {}/{} ({} overage, permitted: {}) - resets {}",
+            "Copilot: used {}/{} ({} overage reqs, permitted: {}) - resets {}",
             used,
             data.premium_entitlement,
-            -data.premium_remaining,
+            data.overage_count,
             data.overage_permitted,
             data.quota_reset_date
         )
