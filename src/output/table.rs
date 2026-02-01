@@ -1,6 +1,5 @@
 use crate::providers::{ClaudeData, CodexData, CopilotData, GeminiData, ProviderData, ProviderStatus};
 use tabled::{builder::Builder, settings::Style, settings::Color, settings::span::Span, settings::style::HorizontalLine, settings::themes::BorderCorrection};
-use colored::Colorize;
 
 /// Format data as a pretty table with UTF-8 borders
 /// Features:
@@ -33,29 +32,76 @@ pub fn format_table(data: &[ProviderData], no_color: bool) -> String {
     }
 
     let mut table = builder.build();
+
+    // Build horizontal lines: double line after header + dotted lines between providers
+    let double_line = HorizontalLine::full('═', '╪', '╞', '╡');
+    let dotted_line = HorizontalLine::full('┄', '┼', '├', '┤');
+
+    // Collect separator positions (after each provider except the last)
+    let mut separator_rows: Vec<usize> = Vec::new();
+    for (i, (start_row, row_count)) in provider_spans.iter().enumerate() {
+        if i < provider_spans.len() - 1 {
+            separator_rows.push(start_row + row_count);
+        }
+    }
+
+    // Apply style based on number of separators needed
+    match separator_rows.len() {
+        0 => {
+            let style = Style::rounded().horizontals([(1, double_line)]);
+            table.with(style);
+        }
+        1 => {
+            let style = Style::rounded().horizontals([
+                (1, double_line),
+                (separator_rows[0], dotted_line),
+            ]);
+            table.with(style);
+        }
+        2 => {
+            let style = Style::rounded().horizontals([
+                (1, double_line),
+                (separator_rows[0], dotted_line.clone()),
+                (separator_rows[1], dotted_line),
+            ]);
+            table.with(style);
+        }
+        3 => {
+            let style = Style::rounded().horizontals([
+                (1, double_line),
+                (separator_rows[0], dotted_line.clone()),
+                (separator_rows[1], dotted_line.clone()),
+                (separator_rows[2], dotted_line),
+            ]);
+            table.with(style);
+        }
+        _ => {
+            // Fallback for 4+ separators (5+ providers)
+            let style = Style::rounded().horizontals([(1, double_line)]);
+            table.with(style);
+        }
+    }
     
-    // Apply rounded UTF-8 style with a double horizontal line after header
-    let double_line = HorizontalLine::full('═', '┼', '├', '┤');
-    let style = Style::rounded()
-        .horizontals([(1, double_line)]);
-    
-    table.with(style);
-    
-    // Apply cell spanning for providers with multiple rows
-    for (start_row, row_count) in provider_spans {
-        if row_count > 1 {
-            table.modify((start_row, 0), Span::row(row_count as isize));
-            table.modify((start_row, 4), Span::row(row_count as isize));
+    // Apply cell spanning for provider column only (status is now per-row)
+    for (start_row, row_count) in &provider_spans {
+        if *row_count > 1 {
+            table.modify((*start_row, 0), Span::row(*row_count as isize));
         }
     }
     
     // Apply colors to cells (using tabled's Color, not ANSI codes)
     if !no_color {
-        // Color header row with background
         use tabled::settings::object::Rows;
-        table.modify(Rows::first(), Color::BG_BLUE | Color::FG_WHITE);
-        
-        // Apply cell-specific colors
+
+        // Bold header row
+        table.modify(Rows::first(), Color::BOLD);
+
+        // Color the Provider column (column 0) in light blue for data rows only
+        for (start_row, _) in &provider_spans {
+            table.modify((*start_row, 0), Color::FG_BRIGHT_BLUE);
+        }
+
+        // Apply cell-specific colors (usage and status columns)
         for (row, col, color) in cell_colors {
             table.modify((row, col), color);
         }
@@ -94,9 +140,9 @@ fn add_provider_rows(
 }
 
 fn add_gemini_rows(
-    builder: &mut Builder, 
-    data: &GeminiData, 
-    provider_data: &ProviderData, 
+    builder: &mut Builder,
+    data: &GeminiData,
+    _provider_data: &ProviderData,
     no_color: bool,
     start_row: usize,
     cell_colors: &mut Vec<(usize, usize, Color)>
@@ -108,20 +154,22 @@ fn add_gemini_rows(
     };
 
     let provider_cell = format!("{}\n{}", provider_name, data.account_email);
-    let status_text = format_status(provider_data.status());
-    let status_color = get_status_color(provider_data.status());
 
-    // Add one row per model
+    // Add one row per model with per-model status
     // Invert usage to show % USED (like other providers) instead of % remaining
     // 100% remaining becomes 0% used, 0% remaining becomes 100% used
     for (i, model) in data.models.iter().enumerate() {
         let reset_str = model.reset_time
             .map(|t| format_reset_time(t))
             .unwrap_or_else(|| "-".to_string());
-        
-        let used_percent = 100.0 - model.remaining_percent;
-        let usage_str = format!("{:.0}%", used_percent);
+
+        let used_percent = (100.0 - model.remaining_percent) as i32;
+        let usage_str = format!("{}%", used_percent);
         let current_row = start_row + i;
+
+        // Per-model status
+        let row_status = get_row_status(used_percent);
+        let status_text = format_status(row_status);
 
         if i == 0 {
             builder.push_record([
@@ -129,7 +177,7 @@ fn add_gemini_rows(
                 model.model.clone(),
                 usage_str,
                 reset_str,
-                status_text.clone(),
+                status_text,
             ]);
         } else {
             builder.push_record([
@@ -137,19 +185,16 @@ fn add_gemini_rows(
                 model.model.clone(),
                 usage_str,
                 reset_str,
-                String::new(),
+                status_text,
             ]);
         }
 
-        // Track colors for usage column (column 2) - now using % used (inverted)
-        // High % used = red (bad), Low % used = green (good)
+        // Track colors for usage (column 2) and status (column 4)
         if !no_color {
-            let usage_color = get_usage_color(used_percent as i32);
+            let usage_color = get_usage_color(used_percent);
+            let status_color = get_status_color(row_status);
             cell_colors.push((current_row, 2, usage_color));
-            // Only color the status on the first row of each provider
-            if i == 0 {
-                cell_colors.push((current_row, 4, status_color.clone()));
-            }
+            cell_colors.push((current_row, 4, status_color));
         }
     }
 
@@ -160,173 +205,149 @@ fn add_gemini_rows(
             "-".to_string(),
             "-".to_string(),
             "-".to_string(),
-            status_text,
+            "✓ OK".to_string(),
         ]);
         if !no_color {
-            cell_colors.push((start_row, 4, status_color));
+            cell_colors.push((start_row, 4, Color::FG_GREEN));
         }
     }
 }
 
 fn add_codex_rows(
-    builder: &mut Builder, 
-    data: &CodexData, 
-    provider_data: &ProviderData, 
+    builder: &mut Builder,
+    data: &CodexData,
+    _provider_data: &ProviderData,
     no_color: bool,
     start_row: usize,
     cell_colors: &mut Vec<(usize, usize, Color)>
 ) {
     let name = "Codex".to_string();
-    let status_text = format_status(provider_data.status());
-    let status_color = get_status_color(provider_data.status());
 
-    // Primary window (usage is "used" percentage, so lower is better)
-    let primary_usage = format!("{}%", data.primary_window.used_percent);
+    // Primary window with per-window status
+    let primary_percent = data.primary_window.used_percent;
+    let primary_usage = format!("{}%", primary_percent);
     let primary_reset = format_seconds(data.primary_window.resets_in_seconds);
-    
+    let primary_status = get_row_status(primary_percent);
+
     builder.push_record([
         name.clone(),
         "Primary".to_string(),
-        primary_usage.clone(),
+        primary_usage,
         primary_reset,
-        status_text.clone(),
+        format_status(primary_status),
     ]);
-    
-    // Track color for primary usage (column 2) - for Codex, lower usage is better (green)
+
     if !no_color {
-        let color = get_usage_color(data.primary_window.used_percent as i32);
-        cell_colors.push((start_row, 2, color));
-        cell_colors.push((start_row, 4, status_color));
+        cell_colors.push((start_row, 2, get_usage_color(primary_percent)));
+        cell_colors.push((start_row, 4, get_status_color(primary_status)));
     }
-    
-    // Secondary window
-    let secondary_usage = format!("{}%", data.secondary_window.used_percent);
+
+    // Secondary window with per-window status
+    let secondary_percent = data.secondary_window.used_percent;
+    let secondary_usage = format!("{}%", secondary_percent);
     let secondary_reset = format_seconds(data.secondary_window.resets_in_seconds);
-    
+    let secondary_status = get_row_status(secondary_percent);
+
     builder.push_record([
         String::new(),
         "Secondary".to_string(),
-        secondary_usage.clone(),
+        secondary_usage,
         secondary_reset,
-        String::new(),
+        format_status(secondary_status),
     ]);
 
-    // Track color for secondary usage
     if !no_color {
-        let color = get_usage_color(data.secondary_window.used_percent as i32);
-        cell_colors.push((start_row + 1, 2, color));
+        cell_colors.push((start_row + 1, 2, get_usage_color(secondary_percent)));
+        cell_colors.push((start_row + 1, 4, get_status_color(secondary_status)));
     }
 }
 
 fn add_copilot_rows(
-    builder: &mut Builder, 
-    data: &CopilotData, 
-    provider_data: &ProviderData, 
+    builder: &mut Builder,
+    data: &CopilotData,
+    _provider_data: &ProviderData,
     no_color: bool,
     start_row: usize,
     cell_colors: &mut Vec<(usize, usize, Color)>
 ) {
     let name = "Copilot".to_string();
-    let status_text = format_status(provider_data.status());
-    let status_color = get_status_color(provider_data.status());
 
-    let remaining_percent = if data.premium_entitlement > 0 {
-        ((data.premium_remaining as f64 / data.premium_entitlement as f64) * 100.0) as i32
+    // Calculate usage percentage (inverted from remaining to align with other providers)
+    // 100% remaining becomes 0% used, 0% remaining becomes 100% used
+    let used_percent = if data.premium_entitlement > 0 {
+        let remaining_fraction = data.premium_remaining as f64 / data.premium_entitlement as f64;
+        ((1.0 - remaining_fraction) * 100.0).clamp(0.0, 100.0) as i32
     } else {
         0
     };
-    
-    let usage_percent = format!("{}%", remaining_percent);
-    
+
+    let usage_str = format!("{}%", used_percent);
+    let row_status = get_row_status(used_percent);
+
     builder.push_record([
         name,
         "Premium Requests".to_string(),
-        usage_percent.clone(),
+        usage_str,
         data.quota_reset_date.clone(),
-        status_text,
+        format_status(row_status),
     ]);
 
-    // Track colors for usage (column 2) and status (column 4)
     if !no_color {
-        let usage_color = get_percentage_color(remaining_percent as f64);
-        cell_colors.push((start_row, 2, usage_color));
-        cell_colors.push((start_row, 4, status_color));
+        cell_colors.push((start_row, 2, get_usage_color(used_percent)));
+        cell_colors.push((start_row, 4, get_status_color(row_status)));
     }
 }
 
 fn add_claude_rows(
-    builder: &mut Builder, 
-    data: &ClaudeData, 
-    provider_data: &ProviderData, 
+    builder: &mut Builder,
+    data: &ClaudeData,
+    _provider_data: &ProviderData,
     no_color: bool,
     start_row: usize,
     cell_colors: &mut Vec<(usize, usize, Color)>
 ) {
     let name = "Claude".to_string();
-    let status_text = format_status(provider_data.status());
-    let status_color = get_status_color(provider_data.status());
 
-    // 5-hour window (utilization is "used" percentage, so lower is better)
-    let five_h_usage = format!("{:.0}%", data.five_hour.utilization);
+    // 5-hour window with per-window status
+    let five_h_percent = data.five_hour.utilization as i32;
+    let five_h_usage = format!("{}%", five_h_percent);
     let five_h_reset = data.five_hour.resets_at
         .map(|t| format_reset_time(t))
         .unwrap_or_else(|| "-".to_string());
-    
+    let five_h_status = get_row_status(five_h_percent);
+
     builder.push_record([
         name.clone(),
         "5h Window".to_string(),
-        five_h_usage.clone(),
+        five_h_usage,
         five_h_reset,
-        status_text.clone(),
+        format_status(five_h_status),
     ]);
-    
-    // Track colors for 5h window (column 2) and status (column 4)
+
     if !no_color {
-        let usage_color = get_usage_color(data.five_hour.utilization as i32);
-        cell_colors.push((start_row, 2, usage_color));
-        cell_colors.push((start_row, 4, status_color));
+        cell_colors.push((start_row, 2, get_usage_color(five_h_percent)));
+        cell_colors.push((start_row, 4, get_status_color(five_h_status)));
     }
-    
-    // 7-day window
-    let seven_d_usage = format!("{:.0}%", data.seven_day.utilization);
+
+    // 7-day window with per-window status
+    let seven_d_percent = data.seven_day.utilization as i32;
+    let seven_d_usage = format!("{}%", seven_d_percent);
     let seven_d_reset = data.seven_day.resets_at
         .map(|t| format_reset_time(t))
         .unwrap_or_else(|| "-".to_string());
-    
+    let seven_d_status = get_row_status(seven_d_percent);
+
     builder.push_record([
         String::new(),
         "7d Window".to_string(),
-        seven_d_usage.clone(),
+        seven_d_usage,
         seven_d_reset,
-        String::new(),
+        format_status(seven_d_status),
     ]);
 
-    // Track color for 7d window (column 2)
     if !no_color {
-        let color = get_usage_color(data.seven_day.utilization as i32);
-        cell_colors.push((start_row + 1, 2, color));
-    }
-}
-
-fn colorize_percentage(percent: f64, text: &str) -> String {
-    if percent >= 80.0 {
-        text.green().to_string()
-    } else if percent >= 50.0 {
-        text.yellow().to_string()
-    } else if percent >= 20.0 {
-        text.bright_yellow().to_string()
-    } else {
-        text.red().to_string()
-    }
-}
-
-fn colorize_usage_percentage(percent: i32, text: &str) -> String {
-    if percent < 50 {
-        text.green().to_string()
-    } else if percent < 80 {
-        text.yellow().to_string()
-    } else {
-        text.red().to_string()
+        cell_colors.push((start_row + 1, 2, get_usage_color(seven_d_percent)));
+        cell_colors.push((start_row + 1, 4, get_status_color(seven_d_status)));
     }
 }
 
@@ -371,20 +392,6 @@ fn get_status_color(status: ProviderStatus) -> Color {
     }
 }
 
-/// Get tabled Color for percentage values (for remaining/quota percentages)
-/// Higher percentage = better (green), lower = warning (yellow/red)
-fn get_percentage_color(percent: f64) -> Color {
-    if percent >= 80.0 {
-        Color::FG_GREEN
-    } else if percent >= 50.0 {
-        Color::FG_YELLOW
-    } else if percent >= 20.0 {
-        Color::FG_BRIGHT_YELLOW
-    } else {
-        Color::FG_RED
-    }
-}
-
 /// Get tabled Color for usage percentages (for utilization/used percentages)
 /// Lower usage = better (green), higher = warning (yellow/red)
 fn get_usage_color(percent: i32) -> Color {
@@ -394,5 +401,15 @@ fn get_usage_color(percent: i32) -> Color {
         Color::FG_YELLOW
     } else {
         Color::FG_RED
+    }
+}
+
+/// Get status based on usage percentage (for per-row status)
+/// Lower usage = OK, higher = warning
+fn get_row_status(used_percent: i32) -> ProviderStatus {
+    if used_percent >= 80 {
+        ProviderStatus::Warning
+    } else {
+        ProviderStatus::Ok
     }
 }
