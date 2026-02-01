@@ -75,7 +75,7 @@ impl Provider for ClaudeProvider {
                 utilization: w.utilization,
                 resets_at: w.resets_at,
             }),
-            seven_day_opus: usage.seven_day_opus.as_ref().map(|w| WindowUsage {
+            seven_day_opus: usage.seven_day_opus.map(|w| WindowUsage {
                 utilization: w.utilization,
                 resets_at: w.resets_at,
             }),
