@@ -5,42 +5,44 @@ use tabled::{builder::Builder, settings::Style, settings::Color, settings::span:
 /// Features:
 /// - Solid UTF-8 lines
 /// - Double line after header
-/// - Cell spanning for provider and status columns
-/// - Proper colorization using tabled's Color settings (no ANSI codes in content)
+/// - Cell spanning for provider/account sections
+/// - Dotted separators between sections (providers and Gemini accounts)
+/// - Proper colorization using tabled's Color settings
 pub fn format_table(data: &[ProviderData], no_color: bool) -> String {
     if data.is_empty() {
         return "No provider data available.".to_string();
     }
 
     let mut builder = Builder::default();
-    
+
     // Add header as first record
     builder.push_record(["Provider", "Model", "Usage", "Resets", "Status"]);
 
-    // Track row indices and colors for each provider
-    let mut provider_spans: Vec<(usize, usize)> = Vec::new(); // (start_row, row_count)
+    // Track section spans (each Gemini account is a section, other providers are single sections)
+    let mut section_spans: Vec<(usize, usize)> = Vec::new(); // (start_row, row_count)
     let mut cell_colors: Vec<(usize, usize, Color)> = Vec::new(); // (row, col, color)
     let mut current_row = 1usize; // Start after header
 
     for provider_data in data {
-        let row_count = count_provider_rows(provider_data);
-        if row_count > 0 {
-            provider_spans.push((current_row, row_count));
+        let spans = add_provider_rows(&mut builder, provider_data, no_color, current_row, &mut cell_colors);
+        for (start, count) in spans {
+            if count > 0 {
+                section_spans.push((start, count));
+                current_row = start + count;
+            }
         }
-        add_provider_rows(&mut builder, provider_data, no_color, current_row, &mut cell_colors);
-        current_row += row_count;
     }
 
     let mut table = builder.build();
 
-    // Build horizontal lines: double line after header + dotted lines between providers
+    // Build horizontal lines: double line after header + dotted lines between sections
     let double_line = HorizontalLine::full('═', '╪', '╞', '╡');
     let dotted_line = HorizontalLine::full('┄', '┼', '├', '┤');
 
-    // Collect separator positions (after each provider except the last)
+    // Collect separator positions (after each section except the last)
     let mut separator_rows: Vec<usize> = Vec::new();
-    for (i, (start_row, row_count)) in provider_spans.iter().enumerate() {
-        if i < provider_spans.len() - 1 {
+    for (i, (start_row, row_count)) in section_spans.iter().enumerate() {
+        if i < section_spans.len() - 1 {
             separator_rows.push(start_row + row_count);
         }
     }
@@ -48,47 +50,72 @@ pub fn format_table(data: &[ProviderData], no_color: bool) -> String {
     // Apply style based on number of separators needed
     match separator_rows.len() {
         0 => {
-            let style = Style::rounded().horizontals([(1, double_line)]);
-            table.with(style);
+            table.with(Style::rounded().horizontals([(1, double_line)]));
         }
         1 => {
-            let style = Style::rounded().horizontals([
+            table.with(Style::rounded().horizontals([
                 (1, double_line),
                 (separator_rows[0], dotted_line),
-            ]);
-            table.with(style);
+            ]));
         }
         2 => {
-            let style = Style::rounded().horizontals([
+            table.with(Style::rounded().horizontals([
                 (1, double_line),
                 (separator_rows[0], dotted_line.clone()),
                 (separator_rows[1], dotted_line),
-            ]);
-            table.with(style);
+            ]));
         }
         3 => {
-            let style = Style::rounded().horizontals([
+            table.with(Style::rounded().horizontals([
                 (1, double_line),
                 (separator_rows[0], dotted_line.clone()),
                 (separator_rows[1], dotted_line.clone()),
                 (separator_rows[2], dotted_line),
-            ]);
-            table.with(style);
+            ]));
+        }
+        4 => {
+            table.with(Style::rounded().horizontals([
+                (1, double_line),
+                (separator_rows[0], dotted_line.clone()),
+                (separator_rows[1], dotted_line.clone()),
+                (separator_rows[2], dotted_line.clone()),
+                (separator_rows[3], dotted_line),
+            ]));
+        }
+        5 => {
+            table.with(Style::rounded().horizontals([
+                (1, double_line),
+                (separator_rows[0], dotted_line.clone()),
+                (separator_rows[1], dotted_line.clone()),
+                (separator_rows[2], dotted_line.clone()),
+                (separator_rows[3], dotted_line.clone()),
+                (separator_rows[4], dotted_line),
+            ]));
+        }
+        6 => {
+            table.with(Style::rounded().horizontals([
+                (1, double_line),
+                (separator_rows[0], dotted_line.clone()),
+                (separator_rows[1], dotted_line.clone()),
+                (separator_rows[2], dotted_line.clone()),
+                (separator_rows[3], dotted_line.clone()),
+                (separator_rows[4], dotted_line.clone()),
+                (separator_rows[5], dotted_line),
+            ]));
         }
         _ => {
-            // Fallback for 4+ separators (5+ providers)
-            let style = Style::rounded().horizontals([(1, double_line)]);
-            table.with(style);
+            // Fallback for 7+ separators
+            table.with(Style::rounded().horizontals([(1, double_line)]));
         }
     }
-    
+
     // Apply cell spanning for provider column only (status is now per-row)
-    for (start_row, row_count) in &provider_spans {
+    for (start_row, row_count) in &section_spans {
         if *row_count > 1 {
             table.modify((*start_row, 0), Span::row(*row_count as isize));
         }
     }
-    
+
     // Apply colors to cells (using tabled's Color, not ANSI codes)
     if !no_color {
         use tabled::settings::object::Rows;
@@ -97,7 +124,7 @@ pub fn format_table(data: &[ProviderData], no_color: bool) -> String {
         table.modify(Rows::first(), Color::BOLD);
 
         // Color the Provider column (column 0) in light blue for data rows only
-        for (start_row, _) in &provider_spans {
+        for (start_row, _) in &section_spans {
             table.modify((*start_row, 0), Color::FG_BRIGHT_BLUE);
         }
 
@@ -106,59 +133,51 @@ pub fn format_table(data: &[ProviderData], no_color: bool) -> String {
             table.modify((row, col), color);
         }
     }
-    
+
     // Correct borders for spanned cells
     table.with(BorderCorrection::span());
 
     table.to_string()
 }
 
-fn count_provider_rows(data: &ProviderData) -> usize {
-    match data {
-        ProviderData::Gemini(gemini) => {
-            let total: usize = gemini.accounts.iter()
-                .map(|a| if a.models.is_empty() { 1 } else { a.models.len() })
-                .sum();
-            if total == 0 { 1 } else { total }
-        }
-        ProviderData::Codex(_) => 2,
-        ProviderData::Copilot(_) => 1,
-        ProviderData::Claude(_) => 2,
-    }
-}
-
+/// Returns a vector of (start_row, row_count) for each section
 fn add_provider_rows(
-    builder: &mut Builder, 
-    data: &ProviderData, 
-    no_color: bool, 
-    start_row: usize,
-    cell_colors: &mut Vec<(usize, usize, Color)>
-) {
-    match data {
-        ProviderData::Gemini(gemini) => add_gemini_rows(builder, gemini, data, no_color, start_row, cell_colors),
-        ProviderData::Codex(codex) => add_codex_rows(builder, codex, data, no_color, start_row, cell_colors),
-        ProviderData::Copilot(copilot) => add_copilot_rows(builder, copilot, data, no_color, start_row, cell_colors),
-        ProviderData::Claude(claude) => add_claude_rows(builder, claude, data, no_color, start_row, cell_colors),
-    }
-}
-
-fn add_gemini_rows(
     builder: &mut Builder,
-    data: &GeminiData,
-    _provider_data: &ProviderData,
+    data: &ProviderData,
     no_color: bool,
     start_row: usize,
     cell_colors: &mut Vec<(usize, usize, Color)>
-) {
-    let mut current_row = start_row;
-    let mut is_first_row = true;
-
-    for account in &data.accounts {
-        add_gemini_account_rows(builder, account, no_color, &mut current_row, cell_colors, &mut is_first_row);
+) -> Vec<(usize, usize)> {
+    match data {
+        ProviderData::Gemini(gemini) => add_gemini_rows(builder, gemini, no_color, start_row, cell_colors),
+        ProviderData::Codex(codex) => {
+            add_codex_rows(builder, codex, no_color, start_row, cell_colors);
+            vec![(start_row, 2)]
+        }
+        ProviderData::Copilot(copilot) => {
+            add_copilot_rows(builder, copilot, no_color, start_row, cell_colors);
+            vec![(start_row, 1)]
+        }
+        ProviderData::Claude(claude) => {
+            add_claude_rows(builder, claude, no_color, start_row, cell_colors);
+            vec![(start_row, 2)]
+        }
     }
+}
 
-    // If no accounts or all accounts empty, add a placeholder row
-    if is_first_row {
+/// Returns a vector of (start_row, row_count) - one span per account
+fn add_gemini_rows(
+    builder: &mut Builder,
+    data: &GeminiData,
+    no_color: bool,
+    start_row: usize,
+    cell_colors: &mut Vec<(usize, usize, Color)>
+) -> Vec<(usize, usize)> {
+    let mut spans: Vec<(usize, usize)> = Vec::new();
+    let mut current_row = start_row;
+
+    if data.accounts.is_empty() {
+        // No accounts - add placeholder row
         builder.push_record([
             "Gemini".to_string(),
             "-".to_string(),
@@ -169,17 +188,29 @@ fn add_gemini_rows(
         if !no_color {
             cell_colors.push((start_row, 4, Color::FG_GREEN));
         }
+        return vec![(start_row, 1)];
     }
+
+    for account in &data.accounts {
+        let account_start = current_row;
+        let row_count = add_gemini_account_rows(builder, account, no_color, current_row, cell_colors);
+        if row_count > 0 {
+            spans.push((account_start, row_count));
+            current_row += row_count;
+        }
+    }
+
+    spans
 }
 
+/// Returns the number of rows added for this account
 fn add_gemini_account_rows(
     builder: &mut Builder,
     account: &GeminiAccountData,
     no_color: bool,
-    current_row: &mut usize,
+    start_row: usize,
     cell_colors: &mut Vec<(usize, usize, Color)>,
-    is_first_row: &mut bool,
-) {
+) -> usize {
     let provider_name = if account.is_active {
         "Gemini".to_string()
     } else {
@@ -188,9 +219,24 @@ fn add_gemini_account_rows(
 
     let provider_cell = format!("{}\n{}", provider_name, account.email);
 
+    if account.models.is_empty() {
+        // No models - add placeholder row for this account
+        builder.push_record([
+            provider_cell,
+            "-".to_string(),
+            "-".to_string(),
+            "-".to_string(),
+            "✓ OK".to_string(),
+        ]);
+        if !no_color {
+            cell_colors.push((start_row, 4, Color::FG_GREEN));
+        }
+        return 1;
+    }
+
     // Add one row per model with per-model status
     // Invert usage to show % USED (like other providers) instead of % remaining
-    for model in &account.models {
+    for (i, model) in account.models.iter().enumerate() {
         let reset_str = model.reset_time
             .map(|t| format_reset_time(t))
             .unwrap_or_else(|| "-".to_string());
@@ -201,8 +247,9 @@ fn add_gemini_account_rows(
         // Per-model status
         let row_status = get_row_status(used_percent);
         let status_text = format_status(row_status);
+        let current_row = start_row + i;
 
-        if *is_first_row {
+        if i == 0 {
             builder.push_record([
                 provider_cell.clone(),
                 model.model.clone(),
@@ -210,7 +257,6 @@ fn add_gemini_account_rows(
                 reset_str,
                 status_text,
             ]);
-            *is_first_row = false;
         } else {
             builder.push_record([
                 String::new(),
@@ -225,44 +271,17 @@ fn add_gemini_account_rows(
         if !no_color {
             let usage_color = get_usage_color(used_percent);
             let status_color = get_status_color(row_status);
-            cell_colors.push((*current_row, 2, usage_color));
-            cell_colors.push((*current_row, 4, status_color));
+            cell_colors.push((current_row, 2, usage_color));
+            cell_colors.push((current_row, 4, status_color));
         }
-
-        *current_row += 1;
     }
 
-    // If account has no models, add a placeholder row
-    if account.models.is_empty() {
-        if *is_first_row {
-            builder.push_record([
-                provider_cell,
-                "-".to_string(),
-                "-".to_string(),
-                "-".to_string(),
-                "✓ OK".to_string(),
-            ]);
-            *is_first_row = false;
-        } else {
-            builder.push_record([
-                String::new(),
-                "-".to_string(),
-                "-".to_string(),
-                "-".to_string(),
-                "✓ OK".to_string(),
-            ]);
-        }
-        if !no_color {
-            cell_colors.push((*current_row, 4, Color::FG_GREEN));
-        }
-        *current_row += 1;
-    }
+    account.models.len()
 }
 
 fn add_codex_rows(
     builder: &mut Builder,
     data: &CodexData,
-    _provider_data: &ProviderData,
     no_color: bool,
     start_row: usize,
     cell_colors: &mut Vec<(usize, usize, Color)>
@@ -311,7 +330,6 @@ fn add_codex_rows(
 fn add_copilot_rows(
     builder: &mut Builder,
     data: &CopilotData,
-    _provider_data: &ProviderData,
     no_color: bool,
     start_row: usize,
     cell_colors: &mut Vec<(usize, usize, Color)>
@@ -347,7 +365,6 @@ fn add_copilot_rows(
 fn add_claude_rows(
     builder: &mut Builder,
     data: &ClaudeData,
-    _provider_data: &ProviderData,
     no_color: bool,
     start_row: usize,
     cell_colors: &mut Vec<(usize, usize, Color)>
