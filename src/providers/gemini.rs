@@ -208,38 +208,103 @@ impl GeminiProvider {
         let models_response = self.fetch_available_models(&access_token, project_id.as_deref(), timeout).await?;
 
         let now = Utc::now();
-        let mut models: Vec<GeminiModelQuota> = Vec::new();
+
+        // Quota buckets: group models that share the same quota
+        // Each bucket tracks: (remaining_percent, reset_time)
+        let mut claude_bucket: Option<(f64, Option<DateTime<Utc>>)> = None;
+        let mut gemini_flash_bucket: Option<(f64, Option<DateTime<Utc>>)> = None;
+        let mut gemini_3_pro_bucket: Option<(f64, Option<DateTime<Utc>>)> = None;
+        let mut gemini_3_pro_image_bucket: Option<(f64, Option<DateTime<Utc>>)> = None;
 
         if let Some(models_map) = models_response.models {
             for (model_key, info) in models_map {
                 if let Some(quota_info) = info.quota_info {
-                    // Use display_name for user-friendly output, fall back to model key
                     let display_name = info.display_name.unwrap_or_else(|| model_key.clone());
                     let lower_name = display_name.to_lowercase();
 
-                    // Filter out internal/test models only
+                    // Filter out internal/test models
                     if lower_name.starts_with("chat_") || lower_name.starts_with("rev19") {
                         continue;
                     }
 
                     let remaining_fraction = quota_info.remaining_fraction.unwrap_or(0.0)
                         .clamp(0.0, 1.0);
+                    let remaining_percent = remaining_fraction * 100.0;
 
                     let reset_time = quota_info.reset_time
                         .and_then(|t| t.parse::<DateTime<Utc>>().ok())
                         .or_else(|| Some(now + chrono::Duration::days(1)));
 
-                    models.push(GeminiModelQuota {
-                        model: display_name,
-                        remaining_percent: remaining_fraction * 100.0,
-                        reset_time,
-                    });
+                    // Categorize into quota buckets
+                    let bucket = if lower_name.contains("claude") || lower_name.contains("gpt-oss") {
+                        Some(&mut claude_bucket)
+                    } else if lower_name.contains("gemini 3 pro image") {
+                        Some(&mut gemini_3_pro_image_bucket)
+                    } else if lower_name.contains("gemini 3 pro") {
+                        Some(&mut gemini_3_pro_bucket)
+                    } else if lower_name.contains("gemini") && lower_name.contains("flash") && !lower_name.contains("2.5") {
+                        Some(&mut gemini_flash_bucket)
+                    } else {
+                        // Skip hidden models (Gemini 2.5 variants, tab_flash_lite_preview, etc.)
+                        None
+                    };
+
+                    if let Some(bucket) = bucket {
+                        // Update bucket with worst-case (minimum remaining, earliest reset)
+                        match bucket {
+                            Some((existing_pct, existing_reset)) => {
+                                if remaining_percent < *existing_pct {
+                                    *existing_pct = remaining_percent;
+                                }
+                                if let (Some(new_reset), Some(old_reset)) = (reset_time, *existing_reset) {
+                                    if new_reset < old_reset {
+                                        *existing_reset = Some(new_reset);
+                                    }
+                                }
+                            }
+                            None => {
+                                *bucket = Some((remaining_percent, reset_time));
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        // Sort models by display name
-        models.sort_by(|a, b| a.model.cmp(&b.model));
+        // Convert buckets to model entries
+        let mut models: Vec<GeminiModelQuota> = Vec::new();
+
+        if let Some((remaining, reset)) = claude_bucket {
+            models.push(GeminiModelQuota {
+                model: "Claude Models".to_string(),
+                remaining_percent: remaining,
+                reset_time: reset,
+            });
+        }
+
+        if let Some((remaining, reset)) = gemini_flash_bucket {
+            models.push(GeminiModelQuota {
+                model: "Gemini Flash".to_string(),
+                remaining_percent: remaining,
+                reset_time: reset,
+            });
+        }
+
+        if let Some((remaining, reset)) = gemini_3_pro_bucket {
+            models.push(GeminiModelQuota {
+                model: "Gemini 3 Pro".to_string(),
+                remaining_percent: remaining,
+                reset_time: reset,
+            });
+        }
+
+        if let Some((remaining, reset)) = gemini_3_pro_image_bucket {
+            models.push(GeminiModelQuota {
+                model: "Gemini 3 Pro Image".to_string(),
+                remaining_percent: remaining,
+                reset_time: reset,
+            });
+        }
 
         Ok(GeminiAccountData {
             email: account.email.clone(),
