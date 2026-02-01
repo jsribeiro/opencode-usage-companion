@@ -18,10 +18,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
+        include:
+          - os: ubuntu-latest
+            bin_path: target/release/ocu
+            archive_name: ocu-linux-x64.tar.gz
+            archive_format: tar.gz
+          - os: macos-latest
+            bin_path: target/release/ocu
+            archive_name: ocu-macos-x64.tar.gz
+            archive_format: tar.gz
+          - os: windows-latest
+            bin_path: target/release/ocu.exe
+            archive_name: ocu-windows-x64.zip
+            archive_format: zip
 
     steps:
       - name: Checkout
@@ -50,3 +59,40 @@ jobs:
             target/release/ocu
             target/release/ocu.exe
           if-no-files-found: error
+
+      - name: Package binary
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import tarfile
+          import zipfile
+
+          bin_path = pathlib.Path(os.environ["BIN_PATH"]).resolve()
+          archive_name = os.environ["ARCHIVE_NAME"]
+          archive_format = os.environ["ARCHIVE_FORMAT"]
+          dist_dir = pathlib.Path("dist")
+          dist_dir.mkdir(exist_ok=True)
+          archive_path = dist_dir / archive_name
+
+          if archive_format == "tar.gz":
+              with tarfile.open(archive_path, "w:gz") as tar:
+                  tar.add(bin_path, arcname=bin_path.name)
+          elif archive_format == "zip":
+              with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                  zf.write(bin_path, arcname=bin_path.name)
+          else:
+              raise SystemExit(f"Unsupported archive format: {archive_format}")
+
+          print(f"Created {archive_path}")
+          PY
+        env:
+          BIN_PATH: ${{ matrix.bin_path }}
+          ARCHIVE_NAME: ${{ matrix.archive_name }}
+          ARCHIVE_FORMAT: ${{ matrix.archive_format }}
+
+      - name: Upload release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.archive_name }}
