@@ -211,11 +211,7 @@ fn add_gemini_account_rows(
     start_row: usize,
     cell_colors: &mut Vec<(usize, usize, Color)>,
 ) -> usize {
-    let provider_name = if account.is_active {
-        "Gemini".to_string()
-    } else {
-        "Gemini [inactive]".to_string()
-    };
+    let provider_name = "Gemini".to_string();
 
     let provider_cell = format!("{}\n{}", provider_name, account.email);
 
