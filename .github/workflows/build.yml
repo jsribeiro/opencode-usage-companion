@@ -64,6 +64,7 @@ jobs:
           if-no-files-found: error
 
       - name: Package binary
+        shell: bash
         run: |
           python - <<'PY'
           import os
