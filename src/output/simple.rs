@@ -37,6 +37,7 @@ fn format_provider_simple(data: &ProviderData, no_color: bool) -> String {
         ProviderData::Codex(codex) => format_codex_simple(codex, no_color),
         ProviderData::Copilot(copilot) => format_copilot_simple(copilot, no_color),
         ProviderData::Claude(claude) => format_claude_simple(claude, no_color),
+        ProviderData::Failed { provider, .. } => format_failed_simple(provider, no_color),
     }
 }
 
@@ -175,4 +176,21 @@ fn format_claude_simple(data: &ClaudeData, no_color: bool) -> String {
         "Claude: 5h: {}, 7d: {} - 5h resets in {}",
         five_h_usage, seven_d_usage, five_h_reset
     )
+}
+
+fn format_failed_simple(provider: &str, no_color: bool) -> String {
+    // Capitalize first letter of provider name
+    let display_name = {
+        let mut chars = provider.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        }
+    };
+
+    if no_color {
+        format!("{}: ? (query failed)", display_name)
+    } else {
+        format!("{}: {} (query failed)", display_name, "?".bright_black())
+    }
 }

@@ -16,10 +16,10 @@
  */
 
 use clap::Parser;
-use colored::control;
+use colored::{control, Colorize};
 use opencode_usage_companion::cli::{Args, ProviderArg};
 use opencode_usage_companion::output::format_output;
-use opencode_usage_companion::providers::{claude::ClaudeProvider, codex::CodexProvider, copilot::CopilotProvider, gemini::GeminiProvider, Provider};
+use opencode_usage_companion::providers::{claude::ClaudeProvider, codex::CodexProvider, copilot::CopilotProvider, gemini::GeminiProvider, Provider, ProviderData};
 use std::process::ExitCode;
 use std::time::Duration;
 
@@ -104,9 +104,11 @@ async fn main() -> ExitCode {
 
     let timeout = Duration::from_secs(args.timeout);
     let mut results = Vec::new();
-    let mut errors = Vec::new();
+    let mut has_errors = false;
+    let mut first_warning = true;
+    let no_color = args.no_color;
 
-    println!("Fetching quota information...\n");
+    println!("Fetching quota information...");
 
     let verbose = args.verbose;
 
@@ -131,8 +133,16 @@ async fn main() -> ExitCode {
             match outcome {
                 Ok(data) => results.push(data),
                 Err((name, e)) => {
-                    eprintln!("Warning: {} failed: {}", name, e);
-                    errors.push((name, e));
+                    if first_warning {
+                        eprintln!();
+                        first_warning = false;
+                    }
+                    print_warning(name, &e.to_string(), no_color);
+                    results.push(ProviderData::Failed {
+                        provider: name.to_string(),
+                        error: e.to_string(),
+                    });
+                    has_errors = true;
                 }
             }
         }
@@ -147,8 +157,16 @@ async fn main() -> ExitCode {
             match provider.fetch(timeout, verbose).await {
                 Ok(data) => results.push(data),
                 Err(e) => {
-                    eprintln!("Warning: {} failed: {}", name, e);
-                    errors.push((name, e));
+                    if first_warning {
+                        eprintln!();
+                        first_warning = false;
+                    }
+                    print_warning(name, &e.to_string(), no_color);
+                    results.push(ProviderData::Failed {
+                        provider: name.to_string(),
+                        error: e.to_string(),
+                    });
+                    has_errors = true;
                 }
             }
         }
@@ -159,13 +177,54 @@ async fn main() -> ExitCode {
         return ExitCode::from(1);
     }
 
-    // Output results
-    let output = format_output(&results, args.format, args.no_color);
-    println!("{}", output);
-
-    if !errors.is_empty() {
-        eprintln!("\nNote: {} provider(s) failed to respond", errors.len());
+    // Check if all results are failures
+    let all_failed = results.iter().all(|r| matches!(r, ProviderData::Failed { .. }));
+    if all_failed {
+        eprintln!("\nError: All provider queries failed.");
+        return ExitCode::from(1);
     }
 
-    ExitCode::from(0)
+    // Output results (with blank line before for separation)
+    println!();
+    let output = format_output(&results, args.format, no_color);
+    println!("{}", output);
+
+    if has_errors {
+        ExitCode::from(1)
+    } else {
+        ExitCode::from(0)
+    }
+}
+
+/// Print a formatted warning message for a failed provider
+fn print_warning(provider: &str, error: &str, no_color: bool) {
+    // Split error message: if it contains a JSON body, put that on a new line
+    let (summary, detail) = if let Some(json_start) = error.find("\n{") {
+        // JSON on its own line already
+        let (s, d) = error.split_at(json_start);
+        (s.trim(), Some(d.trim()))
+    } else if let Some(json_start) = error.find('{') {
+        // JSON inline - split it out
+        let (s, d) = error.split_at(json_start);
+        (s.trim(), Some(d.trim()))
+    } else {
+        (error, None)
+    };
+
+    if no_color {
+        eprintln!("Warning: {} query failed: {}", provider, summary);
+        if let Some(d) = detail {
+            eprintln!("    {}", d);
+        }
+    } else {
+        eprintln!(
+            "{} {} query failed: {}",
+            "Warning:".yellow().bold(),
+            provider.bright_blue(),
+            summary,
+        );
+        if let Some(d) = detail {
+            eprintln!("    {}", d);
+        }
+    }
 }

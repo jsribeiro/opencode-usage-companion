@@ -48,6 +48,11 @@ pub enum ProviderData {
     Codex(CodexData),
     Copilot(CopilotData),
     Claude(ClaudeData),
+    /// Provider API call failed - usage data is unknown
+    Failed {
+        provider: String,
+        error: String,
+    },
 }
 
 /// Gemini/Antigravity provider data (supports multiple accounts)
@@ -121,12 +126,13 @@ pub enum ProviderStatus {
 
 impl ProviderData {
     /// Get the provider name
-    pub fn provider_name(&self) -> &'static str {
+    pub fn provider_name(&self) -> &str {
         match self {
             ProviderData::Gemini(_) => "gemini",
             ProviderData::Codex(_) => "codex",
             ProviderData::Copilot(_) => "copilot",
             ProviderData::Claude(_) => "claude",
+            ProviderData::Failed { provider, .. } => provider,
         }
     }
 
@@ -166,6 +172,7 @@ impl ProviderData {
                     ProviderStatus::Ok
                 }
             }
+            ProviderData::Failed { .. } => ProviderStatus::Error,
         }
     }
 }

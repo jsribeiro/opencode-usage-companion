@@ -1,6 +1,6 @@
 [package]
 name = "opencode-usage-companion"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["João Sena Ribeiro <sena@smux.net>"]
 description = "OpenCode Usage Companion - Check AI provider quotas using existing OpenCode authentication"
