@@ -179,4 +179,4 @@ GPL-3.0-only
 
 ## Author
 
-jsribeiro
+João Sena Ribeiro <sena@smux.net>

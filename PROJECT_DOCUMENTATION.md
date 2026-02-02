@@ -3,7 +3,7 @@
 **Project:** opencode-usage-companion  
 **Command:** `ocu` (short for "OpenCode Usage")  
 **Repository:** `github.com/jsribeiro/opencode-usage-companion`  
-**Author:** jsribeiro  
+**Author:** João Sena Ribeiro <sena@smux.net>  
 **Created:** 2026-02-01  
 **Status:** Implementation Phase  
 
