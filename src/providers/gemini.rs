@@ -24,6 +24,7 @@ use std::time::Duration;
 use crate::auth::{AntigravityAccount, AuthManager, GeminiTokenResponse};
 use crate::error::{QuotaError, Result};
 use crate::providers::{GeminiAccountData, GeminiData, GeminiModelQuota, Provider, ProviderData};
+use colored::Colorize;
 
 /// Public Google OAuth client credentials for CLI/installed apps
 /// These are NOT secrets - see https://developers.google.com/identity/protocols/oauth2/native-app
@@ -403,7 +404,22 @@ impl Provider for GeminiProvider {
                 Ok(data) => account_data.push(data),
                 Err(e) => {
                     // Log error but continue with other accounts
-                    eprintln!("Warning: Failed to fetch quota for {}: {}", account.email, e);
+                    let error_str = e.to_string();
+                    let (summary, detail) = if let Some(json_start) = error_str.find('{') {
+                        let (s, d) = error_str.split_at(json_start);
+                        (s.trim(), Some(d.trim()))
+                    } else {
+                        (error_str.as_str(), None)
+                    };
+                    eprintln!(
+                        "\n{} Failed to fetch quota for {}: {}",
+                        "Warning:".yellow().bold(),
+                        account.email.bright_blue(),
+                        summary
+                    );
+                    if let Some(d) = detail {
+                        eprintln!("    {}", d);
+                    }
                 }
             }
         }

@@ -191,6 +191,10 @@ fn add_provider_rows(
             add_claude_rows(builder, claude, no_color, start_row, cell_colors);
             vec![(start_row, 2)]
         }
+        ProviderData::Failed { provider, .. } => {
+            add_failed_rows(builder, provider, no_color, start_row, cell_colors);
+            vec![(start_row, 1)]
+        }
     }
 }
 
@@ -461,6 +465,39 @@ fn add_claude_rows(
     if !no_color {
         cell_colors.push((start_row + 1, 2, get_usage_color(seven_d_percent)));
         cell_colors.push((start_row + 1, 4, get_status_color(seven_d_status)));
+    }
+}
+
+fn add_failed_rows(
+    builder: &mut Builder,
+    provider: &str,
+    no_color: bool,
+    start_row: usize,
+    cell_colors: &mut Vec<(usize, usize, Color)>,
+) {
+    // Capitalize provider name for display
+    let display_name = capitalize_first(provider);
+
+    builder.push_record([
+        display_name,
+        "-".to_string(),
+        "?".to_string(),
+        "-".to_string(),
+        "✗ FAILED".to_string(),
+    ]);
+
+    if !no_color {
+        cell_colors.push((start_row, 2, Color::FG_BRIGHT_BLACK)); // Gray for unknown usage
+        cell_colors.push((start_row, 4, Color::FG_RED));
+    }
+}
+
+/// Capitalize the first letter of a string
+fn capitalize_first(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
     }
 }
 

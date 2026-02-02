@@ -95,8 +95,8 @@ ocu -t 5
 
 ## Exit Codes
 
-- `0`: Success (data displayed)
-- `1`: Error (network, API, or parse failure)
+- `0`: Success (all providers queried successfully)
+- `1`: Partial success (some providers failed) or complete failure
 - `2`: No providers configured
 
 ## Example Output
@@ -119,10 +119,10 @@ ocu -t 5
 ╰─────────────────────┴──────────────────┴───────┴────────┴────────╯
 ```
 
-- **Usage column**: Shows percentage of quota consumed (0% = all quota available, 100% = quota exhausted)
+- **Usage column**: Shows percentage of quota consumed (0% = all quota available, 100% = quota exhausted, `?` = query failed)
 - **Status column**: Per-row status based on usage (each model/window has its own indicator)
 - **Color coding**: Green (healthy), yellow (warning >50%), red (critical >80%)
-- **Status icons**: `✓ OK`, `⚠️ WARNING`, `✗ ERROR`
+- **Status icons**: `✓ OK`, `⚠️ WARNING`, `✗ ERROR`, `✗ FAILED` (API query failed)
 
 ### JSON Format
 
