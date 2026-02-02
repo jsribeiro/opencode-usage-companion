@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo check:*)",
+      "Bash(powershell.exe -Command \"cargo check 2>&1\")",
+      "Bash(C:Userssena.cargobincargo.exe check)",
+      "Bash(powershell.exe -Command \"& ''C:\\\\Users\\\\sena\\\\.cargo\\\\bin\\\\cargo.exe'' check\")",
+      "Bash(powershell.exe -Command \"& ''C:\\\\Users\\\\sena\\\\.cargo\\\\bin\\\\cargo.exe'' check 2>&1\")",
+      "Bash(powershell.exe -Command \"& ''.\\\\target\\\\release\\\\ocu.exe'' --no-color\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(powershell.exe -Command \"& ''C:\\\\Users\\\\sena\\\\.cargo\\\\bin\\\\cargo.exe'' build --release\")",
+      "Bash(powershell.exe -Command \"& ''C:\\\\Users\\\\sena\\\\.cargo\\\\bin\\\\cargo.exe'' build --release && .\\\\target\\\\release\\\\ocu.exe --no-color\")",
+      "WebSearch",
+      "WebFetch(domain:docs.github.com)",
+      "Bash(cargo build:*)",
+      "Bash(cmd /c \"cargo build\")",
+      "Bash(cmd /c \"cargo build 2>&1\")",
+      "Bash(powershell:*)",
+      "Bash(/c/Users/sena/.cargo/bin/cargo.exe build:*)",
+      "Bash(/c/Users/sena/.cargo/bin/cargo.exe run:*)"
+    ]
+  }
+}

@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2026 João Sena Ribeiro <sena@smux.net>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -80,36 +97,50 @@ impl AuthManager {
 
     /// Get path to OpenCode auth file
     fn get_opencode_auth_path() -> Result<PathBuf> {
-        let home = dirs::home_dir()
-            .ok_or_else(|| QuotaError::AuthFileNotFound("Could not find home directory".to_string()))?;
-        Ok(home.join(".local").join("share").join("opencode").join("auth.json"))
+        let home = dirs::home_dir().ok_or_else(|| {
+            QuotaError::AuthFileNotFound("Could not find home directory".to_string())
+        })?;
+        Ok(home
+            .join(".local")
+            .join("share")
+            .join("opencode")
+            .join("auth.json"))
     }
 
     /// Get possible paths to Antigravity accounts file
     /// Tries multiple locations for cross-platform support
     fn get_antigravity_accounts_paths() -> Vec<PathBuf> {
         let mut paths = Vec::new();
-        
+
         if let Some(home) = dirs::home_dir() {
             // Windows: %APPDATA%/opencode/antigravity-accounts.json
             if let Some(app_data) = dirs::data_dir() {
                 paths.push(app_data.join("opencode").join("antigravity-accounts.json"));
             }
-            
+
             // Windows/Linux: ~/.config/opencode/antigravity-accounts.json
-            paths.push(home.join(".config").join("opencode").join("antigravity-accounts.json"));
-            
+            paths.push(
+                home.join(".config")
+                    .join("opencode")
+                    .join("antigravity-accounts.json"),
+            );
+
             // Linux: ~/.local/share/opencode/antigravity-accounts.json
-            paths.push(home.join(".local").join("share").join("opencode").join("antigravity-accounts.json"));
+            paths.push(
+                home.join(".local")
+                    .join("share")
+                    .join("opencode")
+                    .join("antigravity-accounts.json"),
+            );
         }
-        
+
         paths
     }
 
     /// Read OpenCode auth file
     pub fn read_opencode_auth(&self) -> Result<Option<OpenCodeAuth>> {
         let path = Self::get_opencode_auth_path()?;
-        
+
         if !path.exists() {
             return Ok(None);
         }
@@ -123,7 +154,7 @@ impl AuthManager {
     /// Tries multiple locations and returns the first one found
     pub fn read_antigravity_accounts(&self) -> Result<Option<AntigravityAccounts>> {
         let paths = Self::get_antigravity_accounts_paths();
-        
+
         for path in &paths {
             if path.exists() {
                 let content = std::fs::read_to_string(path)?;
@@ -148,9 +179,18 @@ impl AuthManager {
                 // since the Gemini provider only supports Antigravity accounts
                 Ok(antigravity_accounts.is_some())
             }
-            "claude" => Ok(opencode_auth.as_ref().map(|a| a.anthropic.is_some()).unwrap_or(false)),
-            "codex" => Ok(opencode_auth.as_ref().map(|a| a.openai.is_some()).unwrap_or(false)),
-            "copilot" => Ok(opencode_auth.as_ref().map(|a| a.github_copilot.is_some()).unwrap_or(false)),
+            "claude" => Ok(opencode_auth
+                .as_ref()
+                .map(|a| a.anthropic.is_some())
+                .unwrap_or(false)),
+            "codex" => Ok(opencode_auth
+                .as_ref()
+                .map(|a| a.openai.is_some())
+                .unwrap_or(false)),
+            "copilot" => Ok(opencode_auth
+                .as_ref()
+                .map(|a| a.github_copilot.is_some())
+                .unwrap_or(false)),
             _ => Ok(false),
         }
     }
