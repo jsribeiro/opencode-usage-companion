@@ -175,7 +175,7 @@ Built with:
 
 ## License
 
-MIT
+GPL-3.0-only
 
 ## Author
 
