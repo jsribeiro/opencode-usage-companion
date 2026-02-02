@@ -772,17 +772,11 @@ if results.is_empty() {
 ## 12. Testing Status
 
 ### Completed Testing
-- ✅ **Windows (x64, ARM64)**: Fully tested and verified
-  - PowerShell integration
-  - All 4 providers working
-  - Concurrent queries verified
-  - Color output tested
+- ✅ **Windows**: Fully tested and verified
 
-### Future Testing (Not Yet Done)
-- ⚠️ **macOS (Intel & Apple Silicon)**: Binaries built but not tested on real hardware
-- ⚠️ **Linux (x64)**: Binaries built but not tested on real hardware
-
-**Note:** While cross-platform binaries are built automatically by CI/CD, they should be tested on actual macOS and Linux systems before considering the project fully "battle-tested" on all platforms.
+### Future Testing
+- ⚠️ **macOS**: Not yet tested on real hardware
+- ⚠️ **Linux**: Not yet tested on real hardware
 
 ---
 
@@ -1070,26 +1064,7 @@ Create `.github/workflows/release.yml`:
 
 ---
 
-## Appendix A: Testing Notes
-
-### Platform-Specific Testing
-
-**Windows (Fully Tested)**
-- All features verified working
-- Tested on both x64 and ARM64 architectures
-- PowerShell integration confirmed
-
-**macOS (Build Only)**
-- Binaries built for both Intel (x86_64) and Apple Silicon (aarch64)
-- Awaiting real hardware testing
-
-**Linux (Build Only)**
-- Binaries built for x64 (x86_64-unknown-linux-gnu)
-- Awaiting real hardware testing
-
----
-
-## Appendix B: Example Auth Files
+## Appendix A: Example Auth Files
 
 ### OpenCode Auth (`~/.local/share/opencode/auth.json`)
 
