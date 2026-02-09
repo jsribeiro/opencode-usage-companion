@@ -117,6 +117,7 @@ fn format_codex_simple(data: &CodexData, no_color: bool) -> String {
 
 fn format_copilot_simple(data: &CopilotData, no_color: bool) -> String {
     let used = data.premium_entitlement - data.premium_remaining;
+    let overage_used = (-data.premium_remaining).max(0);
 
     // Calculate usage percentage for coloring
     let used_percent = if data.premium_entitlement > 0 {
@@ -139,10 +140,10 @@ fn format_copilot_simple(data: &CopilotData, no_color: bool) -> String {
         }
     };
 
-    if data.premium_remaining < 0 || data.overage_count > 0 {
+    if overage_used > 0 {
         format!(
-            "Copilot: used {} ({} overage reqs, permitted: {}) - resets {}",
-            usage_display, data.overage_count, data.overage_permitted, data.quota_reset_date
+            "Copilot: used {} ({} over entitlement, permitted: {}) - resets {}",
+            usage_display, overage_used, data.overage_permitted, data.quota_reset_date
         )
     } else {
         format!(

@@ -366,6 +366,7 @@ fn add_copilot_rows(
     cell_colors: &mut Vec<(usize, usize, Color)>,
 ) -> usize {
     let name = "Copilot".to_string();
+    let overage_used = (-data.premium_remaining).max(0);
 
     // Calculate usage percentage (inverted from remaining to align with other providers)
     // 100% remaining becomes 0% used, 0% remaining becomes 100% used
@@ -392,12 +393,12 @@ fn add_copilot_rows(
         cell_colors.push((start_row, 4, get_status_color(row_status)));
     }
 
-    // Add overage row if the API reported overage requests
-    if data.overage_count > 0 {
-        let overage_str = format!("{} reqs", data.overage_count);
+    // Add overage row when premium remaining goes negative
+    if overage_used > 0 {
+        let overage_str = format!("{} reqs", overage_used);
         builder.push_record([
             String::new(),
-            "Overage Requests".to_string(),
+            "Over Entitlement".to_string(),
             overage_str,
             "".to_string(),
             "".to_string(),
